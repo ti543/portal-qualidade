@@ -6,6 +6,16 @@
   <title>RG 22 - Controle de Competências</title>
 <link rel="icon" href="../assets/icons/icon-192.png">
 <link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
+<!-- Fonte "Inter" via Google Fonts — garante que o app pareça igual em
+     qualquer aparelho (PC, celular, Windows, Mac, Android...), em vez de
+     depender da fonte "Segoe UI" instalada no computador (só existe no
+     Windows; em outro sistema o navegador troca sozinho por uma fonte de
+     reserva diferente, e as letras saem com outra cara). Continua tendo
+     o stack antigo como reserva (abaixo, no CSS) caso a internet falhe
+     bem na hora de abrir. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="../assets/layout.css" rel="stylesheet">
   <!-- Gera o PDF do registro de treinamento (RG 24) inteiramente no navegador —
        mesma técnica já usada na Biblioteca de Documentos: html2canvas "fotografa"
@@ -23,7 +33,7 @@
       --danger-bg: #ffc7ce; --danger-text: #9c0006;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; background-color: var(--light-bg); padding-bottom: 60px; }
+    body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; background-color: var(--light-bg); padding-bottom: 60px; }
 
     /* CABEÇALHO GLOBAL NORMATIVO */
     /* BARRA DE CONTROLES DO MODULO (ficha ISO) */
@@ -803,7 +813,7 @@
       container.style.background = '#fff';
       container.style.boxSizing = 'border-box';
       container.style.padding = '0';
-      container.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+      container.style.fontFamily = "'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
       container.innerHTML = `
         <div class="rgtr-cabecalho">
           <div class="rgtr-cab-logo">${logoSrc ? `<img src="${logoSrc}" alt="MirindoSul">` : ''}</div>
@@ -833,6 +843,13 @@
       document.body.appendChild(container);
 
       try {
+        // Espera a fonte "Inter" carregar de verdade antes da "foto" do
+        // html2canvas — sem isso o PDF podia sair com a fonte de reserva do
+        // PC de quem gerou (cada um diferente) em vez de sempre igual.
+        await Promise.race([
+          document.fonts.ready,
+          new Promise(resolve => setTimeout(resolve, 1500))
+        ]);
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
         const { jsPDF } = window.jspdf;

@@ -6,6 +6,16 @@
   <title>Biblioteca de Documentos</title>
 <link rel="icon" href="../assets/icons/icon-192.png">
 <link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
+<!-- Fonte "Inter" via Google Fonts — garante que o app pareça igual em
+     qualquer aparelho (PC, celular, Windows, Mac, Android...), em vez de
+     depender da fonte "Segoe UI" instalada no computador (só existe no
+     Windows; em outro sistema o navegador troca sozinho por uma fonte de
+     reserva diferente, e as letras saem com outra cara). Continua tendo
+     o stack antigo como reserva (abaixo, no CSS) caso a internet falhe
+     bem na hora de abrir. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link href="../assets/layout.css" rel="stylesheet">
   <!-- Lê o .docx inteiro no navegador (nada é enviado pra nenhum servidor além
@@ -973,7 +983,7 @@
       container.style.width = largCaptura + 'px';
       container.style.background = '#fff';
       container.style.boxSizing = 'border-box';
-      container.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+      container.style.fontFamily = "'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
       container.classList.add('doc-pdf-captura');
       container.innerHTML = `
         ${renderCabecalhoOficial(d)}
@@ -990,7 +1000,17 @@
 
       try {
         // Dá um respiro pro navegador terminar de montar o layout e decodificar
-        // imagens (base64 do Word, por exemplo) antes de tirar a "foto".
+        // imagens (base64 do Word, por exemplo) antes de tirar a "foto". Espera
+        // também a fonte "Inter" acabar de carregar (document.fonts.ready) —
+        // sem isso, se a internet estivesse um pouco lenta bem na hora de gerar
+        // o PDF, a "foto" podia sair com a fonte de reserva (que varia de PC
+        // pra PC) em vez da Inter, fazendo o PDF sair diferente dependendo de
+        // quem gerou. Um timeout de segurança evita travar pra sempre se, por
+        // algum motivo, a fonte nunca "resolver".
+        await Promise.race([
+          document.fonts.ready,
+          new Promise(resolve => setTimeout(resolve, 1500))
+        ]);
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
         const escala = 2; // nitidez de impressão sem deixar o arquivo gigante

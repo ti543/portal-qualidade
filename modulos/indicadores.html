@@ -6,6 +6,16 @@
   <title>RG 06 - Monitoramento de Indicadores Translog</title>
 <link rel="icon" href="../assets/icons/icon-192.png">
 <link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
+<!-- Fonte "Inter" via Google Fonts — garante que o app pareça igual em
+     qualquer aparelho (PC, celular, Windows, Mac, Android...), em vez de
+     depender da fonte "Segoe UI" instalada no computador (só existe no
+     Windows; em outro sistema o navegador troca sozinho por uma fonte de
+     reserva diferente, e as letras saem com outra cara). Continua tendo
+     o stack antigo como reserva (abaixo, no CSS) caso a internet falhe
+     bem na hora de abrir. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link href="../assets/layout.css" rel="stylesheet">
   <style>
@@ -21,7 +31,7 @@
       --unit-col-width: 180px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; background-color: var(--light-bg); padding-bottom: 60px; }
+    body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; background-color: var(--light-bg); padding-bottom: 60px; }
     
     body.readonly-mode .edit-only, body.readonly-mode button:not(.mode-toggle):not(.nav-btn):not(#qc-btn-sair):not(#qc-sidebar-toggle), body.readonly-mode .th-input-edit { display: none !important; }
     body.readonly-mode .th-text-readonly { display: block !important; }
