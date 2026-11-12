@@ -78,6 +78,28 @@
     .th-clickable-cfg { cursor: pointer; padding: 4px 0; display: block; }
     .th-clickable-cfg:hover { background-color: rgba(255,255,255,0.15); }
 
+    /* Pegador pra arrastar e redimensionar, igual no Excel: uma faixinha
+       transparente bem fina na borda direita de cada cabeçalho de coluna
+       (muda o cursor pra indicar que dá pra arrastar) e outra na borda de
+       baixo de cada linha da tabela. Fica disponível mesmo em modo leitura
+       (adm travado) — redimensionar é só um ajuste de visualização, não
+       uma edição de dado, então não tem por que travar isso também. */
+    .col-resize-handle {
+      /* "right:0" (em vez de um valor negativo) de propósito — a célula
+         (th/td) tem "overflow:hidden" pra cortar texto comprido, então
+         qualquer coisa posicionada PRA FORA da borda da célula fica
+         cortada e não recebe clique nenhum. Preso bem na borda interna. */
+      position: absolute; top: 0; right: 0; width: 8px; height: 100%;
+      cursor: col-resize; z-index: 6; touch-action: none;
+    }
+    .col-resize-handle:hover, .col-resize-handle.resizing { background: rgba(255,255,255,0.35); }
+    .row-resize-handle {
+      /* Mesmo motivo do .col-resize-handle acima: "bottom:0", não negativo. */
+      position: absolute; left: 0; bottom: 0; width: 100%; height: 8px;
+      cursor: row-resize; z-index: 6; touch-action: none;
+    }
+    .row-resize-handle:hover, .row-resize-handle.resizing { background: rgba(0,0,128,0.12); }
+
     .input-cell { width: 100%; border: none; background: transparent; text-align: center; font-size: 11px; padding: 2px 0; font-weight: inherit; color: inherit; }
     .input-cell:focus { background: white; outline: 2px solid var(--primary-color); border-radius: 2px; }
 
@@ -113,7 +135,17 @@
   <div id="carregando" style="position:fixed;inset:0;background:rgba(244,245,249,.95);display:flex;align-items:center;justify-content:center;color:#666;z-index:9000;">Carregando indicadores...</div>
 
   <div class="module-controls-bar">
-    <button class="mode-toggle" onclick="alternarModoLeitura()" id="btn-leitura-mestre">👁️ Modo Leitura</button>
+    <!-- "edit-only" some sozinho pra quem não é master, porque quem não é
+         master já fica travado em readonly-mode (ver initLayout abaixo) e
+         a regra "body.readonly-mode .edit-only { display:none }" já esconde
+         isso automaticamente — não precisa de nenhuma checagem extra aqui. -->
+    <div class="size-control-box edit-only" style="gap:8px;">
+      <span>🔧 Arrastar borda de coluna/linha:</span>
+      <select id="sel-modo-ajuste" onchange="mudarModoAjusteGlobal(this.value === 'global')">
+        <option value="global">Vale pra todo mundo</option>
+        <option value="local">Só pra mim</option>
+      </select>
+    </div>
   </div>
 
   <div class="main-layout">
@@ -193,6 +225,181 @@
       if (str === null || str === undefined) return '';
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
+
+    /* ======================================================================
+       AJUSTE DE LARGURA/ALTURA ARRASTANDO A DIVISA (tipo Excel)
+       ======================================================================
+       Quem é master (qualidade) escolhe no seletor "sel-modo-ajuste" se o
+       ajuste que ele arrastar vale pra TODO MUNDO (grava em dbEstrutura e
+       sincroniza com o Firebase, igual já acontecia antes) ou SÓ PRA ELE
+       (fica só no navegador dele, numa chave separada do localStorage que
+       NUNCA é sincronizada com o Firebase). Quem não é master (adm/filial)
+       só pode ajustar pra si mesmo — o módulo já trava esse usuário em
+       readonly-mode mais abaixo, então nem precisa checar de novo aqui: o
+       seletor em si já fica escondido pra ele (classe "edit-only").
+       Limitação conhecida: a altura da linha é guardada pela POSIÇÃO dela
+       na lista (0, 1, 2...), então se a ordem das filiais mudar, o ajuste
+       de altura pode acabar valendo pra outra linha. Como é só um ajuste
+       visual (não afeta os dados), o pior caso é só ter que arrastar de
+       novo — não há risco de perda de informação. */
+    let modoAjusteGlobal = true;
+    let larguraLocal = {};       // { unidade: px, mensal: px } — só este navegador
+    let alturasLinhasLocais = {}; // { [aba]: { [idxLinha]: px } } — só este navegador
+
+    function carregarAjustesLocais() {
+      try {
+        const bruto = localStorage.getItem('rg06_ajustes_locais');
+        if (bruto) {
+          const obj = JSON.parse(bruto);
+          larguraLocal = obj.largura || {};
+          alturasLinhasLocais = obj.alturas || {};
+          if (obj.modoGlobal !== undefined) modoAjusteGlobal = obj.modoGlobal;
+        }
+      } catch (e) { console.error('Erro ao carregar ajustes locais:', e); }
+      const sel = document.getElementById('sel-modo-ajuste');
+      if (sel) sel.value = modoAjusteGlobal ? 'global' : 'local';
+    }
+
+    function salvarAjustesLocais() {
+      try {
+        localStorage.setItem('rg06_ajustes_locais', JSON.stringify({
+          largura: larguraLocal, alturas: alturasLinhasLocais, modoGlobal: modoAjusteGlobal
+        }));
+      } catch (e) { console.error('Erro ao salvar ajustes locais:', e); }
+    }
+
+    function mudarModoAjusteGlobal(valorGlobal) {
+      modoAjusteGlobal = valorGlobal;
+      if (modoAjusteGlobal) {
+        // Troca pra "vale pra todo mundo": limpa os ajustes que estavam só
+        // neste navegador, pra eles não ficarem "escondendo" o valor global.
+        larguraLocal = {};
+        alturasLinhasLocais = {};
+      }
+      salvarAjustesLocais();
+      construirTelaPainel();
+    }
+
+    function larguraEfetivaUnidade() {
+      if (larguraLocal.unidade) return larguraLocal.unidade;
+      return parseInt(dbEstrutura._unitColWidth, 10) || 180;
+    }
+
+    function larguraEfetivaMensal() {
+      if (larguraLocal.mensal) return larguraLocal.mensal;
+      return parseInt(dbEstrutura._colWidth, 10) || 85;
+    }
+
+    function alturaEfetivaLinha(idxLinha) {
+      if (alturasLinhasLocais[abaAtiva] && alturasLinhasLocais[abaAtiva][idxLinha] !== undefined) {
+        return alturasLinhasLocais[abaAtiva][idxLinha];
+      }
+      if (dbEstrutura._rowHeights && dbEstrutura._rowHeights[abaAtiva] && dbEstrutura._rowHeights[abaAtiva][idxLinha] !== undefined) {
+        return dbEstrutura._rowHeights[abaAtiva][idxLinha];
+      }
+      return null; // null = altura padrão, sem estilo inline
+    }
+
+    function aplicarLarguraNaTela() {
+      document.documentElement.style.setProperty('--col-width', larguraEfetivaMensal() + 'px');
+      document.documentElement.style.setProperty('--unit-col-width', larguraEfetivaUnidade() + 'px');
+    }
+
+    function persistirLarguraUnidade(valor) {
+      if (modoAjusteGlobal && window.__souQualidade) {
+        dbEstrutura._unitColWidth = String(valor);
+        localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
+      } else {
+        larguraLocal.unidade = valor;
+        salvarAjustesLocais();
+      }
+    }
+
+    function persistirLarguraMensal(valor) {
+      if (modoAjusteGlobal && window.__souQualidade) {
+        dbEstrutura._colWidth = String(valor);
+        localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
+      } else {
+        larguraLocal.mensal = valor;
+        salvarAjustesLocais();
+      }
+    }
+
+    function persistirAlturaLinha(idxLinha, valor) {
+      if (modoAjusteGlobal && window.__souQualidade) {
+        if (!dbEstrutura._rowHeights) dbEstrutura._rowHeights = {};
+        if (!dbEstrutura._rowHeights[abaAtiva]) dbEstrutura._rowHeights[abaAtiva] = {};
+        dbEstrutura._rowHeights[abaAtiva][idxLinha] = valor;
+        localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
+      } else {
+        if (!alturasLinhasLocais[abaAtiva]) alturasLinhasLocais[abaAtiva] = {};
+        alturasLinhasLocais[abaAtiva][idxLinha] = valor;
+        salvarAjustesLocais();
+      }
+    }
+
+    // Arrastar (mouse ou toque) — delegado no document, então funciona mesmo
+    // depois que a tabela é reconstruída do zero a cada edição.
+    let estadoArraste = null;
+
+    function posXY(e) {
+      if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    function iniciarArraste(e) {
+      const alca = e.target.closest('.col-resize-handle, .row-resize-handle');
+      if (!alca) return;
+      e.preventDefault();
+      const p = posXY(e);
+      estadoArraste = {
+        tipo: alca.dataset.resize,
+        idxLinha: alca.dataset.rowIdx !== undefined ? parseInt(alca.dataset.rowIdx, 10) : null,
+        startX: p.x, startY: p.y,
+        largInicial: alca.dataset.resize === 'unit' ? larguraEfetivaUnidade() : larguraEfetivaMensal(),
+        alturaInicial: alca.dataset.resize === 'linha' ? (alturaEfetivaLinha(parseInt(alca.dataset.rowIdx, 10)) || 30) : null,
+      };
+      alca.classList.add('resizing');
+      document.body.style.userSelect = 'none';
+    }
+
+    function moverArraste(e) {
+      if (!estadoArraste) return;
+      const p = posXY(e);
+      if (estadoArraste.tipo === 'unit') {
+        const novo = Math.max(120, Math.min(400, Math.round(estadoArraste.largInicial + (p.x - estadoArraste.startX))));
+        document.documentElement.style.setProperty('--unit-col-width', novo + 'px');
+        estadoArraste.valorAtual = novo;
+      } else if (estadoArraste.tipo === 'mensal') {
+        const novo = Math.max(50, Math.min(400, Math.round(estadoArraste.largInicial + (p.x - estadoArraste.startX))));
+        document.documentElement.style.setProperty('--col-width', novo + 'px');
+        estadoArraste.valorAtual = novo;
+      } else if (estadoArraste.tipo === 'linha') {
+        const novo = Math.max(24, Math.min(200, Math.round(estadoArraste.alturaInicial + (p.y - estadoArraste.startY))));
+        const linhasTbody = document.querySelectorAll('.excel-table tbody tr');
+        if (linhasTbody[estadoArraste.idxLinha]) linhasTbody[estadoArraste.idxLinha].style.height = novo + 'px';
+        estadoArraste.valorAtual = novo;
+      }
+    }
+
+    function terminarArraste() {
+      if (!estadoArraste) return;
+      document.querySelectorAll('.resizing').forEach(el => el.classList.remove('resizing'));
+      document.body.style.userSelect = '';
+      if (estadoArraste.valorAtual !== undefined) {
+        if (estadoArraste.tipo === 'unit') persistirLarguraUnidade(estadoArraste.valorAtual);
+        else if (estadoArraste.tipo === 'mensal') persistirLarguraMensal(estadoArraste.valorAtual);
+        else if (estadoArraste.tipo === 'linha') persistirAlturaLinha(estadoArraste.idxLinha, estadoArraste.valorAtual);
+      }
+      estadoArraste = null;
+    }
+
+    document.addEventListener('mousedown', iniciarArraste);
+    document.addEventListener('mousemove', moverArraste);
+    document.addEventListener('mouseup', terminarArraste);
+    document.addEventListener('touchstart', iniciarArraste, { passive: false });
+    document.addEventListener('touchmove', moverArraste, { passive: false });
+    document.addEventListener('touchend', terminarArraste);
 
     // Ponte com o Firestore: tudo que já chamava localStorage.setItem('rg06_db_v6', ...)
     // continua funcionando igual, e além de gravar local, agora também sincroniza
@@ -309,11 +516,6 @@
 
     let abaAtiva = "Ações Pendentes";
 
-    function alternarModoLeitura() {
-      document.body.classList.toggle('readonly-mode');
-      document.getElementById('btn-leitura-mestre').innerText = document.body.classList.contains('readonly-mode') ? "✏️ Entrar em Edição" : "👁️ Modo Leitura";
-    }
-
     function trocarContextoAba(id) {
       abaAtiva = id;
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -402,22 +604,6 @@
       popoverColunaAlvo = "";
     }
 
-    // Largura das colunas: global (um valor salvo no Firebase pra todo mundo
-    // que acessa o sistema), não mais uma preferência só do navegador.
-    function mudarLarguraColunaMestre(novaLarg) {
-      dbEstrutura._colWidth = novaLarg;
-      localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
-      document.documentElement.style.setProperty('--col-width', novaLarg + 'px');
-      document.getElementById('lbl-largura-val').innerText = novaLarg + 'px';
-    }
-
-    function mudarLarguraColunaUnidade(novaLarg) {
-      dbEstrutura._unitColWidth = novaLarg;
-      localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
-      document.documentElement.style.setProperty('--unit-col-width', novaLarg + 'px');
-      document.getElementById('lbl-largura-unidade-val').innerText = novaLarg + 'px';
-    }
-
     function atualizarValorComplexo(lIdx, chaveMes, campoCol, valor) {
       // Observação: `linhas` é um array de objetos {nome, dados} - NUNCA array
       // de arrays (Firestore não aceita array dentro de array: "invalid nested entity").
@@ -464,6 +650,7 @@
           <input type="text" class="th-input-edit" value="${escapeHtml(txt)}" onchange="dbEstrutura['${abaAtiva}'].titulosCol['${subColId}']=this.value; localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura)); construirTelaPainel();" onclick="event.stopPropagation()">
           <span class="th-text-readonly">${escapeHtml(txt)}</span>
         </div>
+        <div class="col-resize-handle" data-resize="mensal" title="Arraste pra redimensionar" onclick="event.stopPropagation()"></div>
       `;
     }
 
@@ -569,9 +756,6 @@
       const alvo = document.getElementById("painel-principal-conteudo");
       alvo.innerHTML = "";
 
-      let larguraSalva = dbEstrutura._colWidth || "85";
-      let larguraUnidadeSalva = dbEstrutura._unitColWidth || "180";
-
       Object.keys(dbEstrutura).forEach(k => {
         let dot = document.getElementById(`dot-${k}`);
         let txtMenu = document.getElementById(`menu-txt-${k}`);
@@ -589,8 +773,7 @@
 
       if (abaAtiva === "Ações Pendentes") {
         alvo.innerHTML = renderizarAcoesPendentesAgregadas();
-        document.documentElement.style.setProperty('--col-width', larguraSalva + 'px');
-        document.documentElement.style.setProperty('--unit-col-width', larguraUnidadeSalva + 'px');
+        aplicarLarguraNaTela();
         return;
       }
 
@@ -615,18 +798,7 @@
       let totalSubColsPorMes = subChavesMapeadas.length;
 
       let htmlGeral = `
-        <div class="size-control-wrapper edit-only">
-          <div class="size-control-box">
-            <span>Largura Unidade:</span>
-            <input type="range" min="120" max="300" value="${larguraUnidadeSalva}" oninput="mudarLarguraColunaUnidade(this.value)">
-            <span id="lbl-largura-unidade-val">${larguraUnidadeSalva}px</span>
-          </div>
-          <div class="size-control-box">
-            <span>Largura Colunas Mensais:</span>
-            <input type="range" min="65" max="400" value="${larguraSalva}" oninput="mudarLarguraColunaMestre(this.value)">
-            <span id="lbl-largura-val">${larguraSalva}px</span>
-          </div>
-        </div>
+        <p class="qc-hint edit-only" style="margin-bottom:10px;">Dica: arraste a bordinha direita de uma coluna (ou a de baixo de uma linha) pra redimensionar, igual no Excel.</p>
 
         <div class="indicador-meta-box">
           <div class="meta-field"><label>Indicador / Processo Vinculado</label><input type="text" value="${escapeHtml(info.processo||'')}" onchange="atualizarNomeIndicadorGlobal(this.value)"></div>
@@ -645,7 +817,7 @@
             <table class="excel-table">
               <thead>
                 <tr>
-                  <th rowspan="2">Filial / Contexto</th>
+                  <th rowspan="2">Filial / Contexto<div class="col-resize-handle" data-resize="unit" title="Arraste pra redimensionar"></div></th>
       `;
 
       periodosAtivos.forEach(m => {
@@ -727,14 +899,16 @@
         if (!l || typeof l !== 'object') return;
         let nomeLinha = l.nome || '';
         if (!l.dados) l.dados = {};
-        
+
+        let alturaLinha = alturaEfetivaLinha(lIdx);
         htmlGeral += `
-          <tr>
+          <tr${alturaLinha ? ` style="height:${alturaLinha}px;"` : ''}>
             <td>
               <div style="display:flex; align-items:center; gap:4px;">
                 <button class="btn-action edit-only" style="background:#dc3545; padding:2px 5px; margin:0; font-size:9px;" onclick="if(confirm('Excluir filial?')){info.linhas.splice(${lIdx},1); localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura)); construirTelaPainel();}">X</button>
                 <input type="text" class="input-cell" style="text-align:left; font-weight:bold;" value="${escapeHtml(nomeLinha)}" onchange="atualizarValorLinhaDireta(${lIdx}, 0, this.value)">
               </div>
+              <div class="row-resize-handle" data-resize="linha" data-row-idx="${lIdx}" title="Arraste pra mudar a altura da linha"></div>
             </td>
         `;
 
@@ -1016,8 +1190,7 @@
       htmlGeral += `</div>`;
 
       alvo.innerHTML = htmlGeral;
-      document.documentElement.style.setProperty('--col-width', larguraSalva + 'px');
-      document.documentElement.style.setProperty('--unit-col-width', larguraUnidadeSalva + 'px');
+      aplicarLarguraNaTela();
     }
 
     document.addEventListener("click", function(e) {
@@ -1045,10 +1218,7 @@
         agendarSalvamentoFirestore();
       }
 
-      let baseWidth = dbEstrutura._colWidth || "85";
-      let baseUnitWidth = dbEstrutura._unitColWidth || "180";
-      document.documentElement.style.setProperty('--col-width', baseWidth + 'px');
-      document.documentElement.style.setProperty('--unit-col-width', baseUnitWidth + 'px');
+      aplicarLarguraNaTela();
 
       construirTelaPainel();
       document.getElementById('carregando').style.display = 'none';
@@ -1073,11 +1243,17 @@
       isoCollection: 'modulo_config',
       isoEditLevel: 'qualidade'
     }).then(({ souQualidade }) => {
+      // Exposto global pra ser lido pelo script de arraste de coluna/linha
+      // (que está num <script> comum, não-módulo, então não enxerga essa
+      // const diretamente). Só master (qualidade) pode escolher "vale pra
+      // todo mundo" — quem não é master sempre ajusta só pra si mesmo.
+      window.__souQualidade = souQualidade;
+
       if (!souQualidade) {
         document.body.classList.add('readonly-mode');
-        const btnModo = document.getElementById('btn-leitura-mestre');
-        if (btnModo) btnModo.style.display = 'none';
       }
+
+      carregarAjustesLocais();
 
       const docRef = doc(db, 'indicadores_rg06', 'dados');
       window.__marcarFirestoreDocRef(docRef);
