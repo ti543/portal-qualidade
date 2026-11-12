@@ -516,11 +516,14 @@
           let ata = indObj.atas[m] || {};
 
           // Só é uma "pendência" de verdade se tiver algo ESCRITO (a análise
-          // do indicador ou a ação/tratativa) — não basta só ter marcado uma
-          // data, um responsável ou um status sem explicação nenhuma, isso
-          // sozinho não conta como pendência de verdade. Só preencher esses
-          // campos "de apoio" sem nunca escrever nada não aparece aqui.
-          let temConteudo = !!(ata.decidido || ata.acao);
+          // do indicador ou a ação/tratativa) E também o status tiver sido
+          // escolhido de propósito (ata.status só existe depois que a pessoa
+          // mexeu no seletor pelo menos uma vez — antes disso ele vem
+          // undefined, mesmo a tela mostrando "Pendente" como valor padrão
+          // do <select>). Só um dos dois não é suficiente: uma data/
+          // responsável preenchido sozinho, ou um status marcado sem nunca
+          // escrever nada, não contam como pendência de verdade.
+          let temConteudo = !!(ata.status && (ata.decidido || ata.acao));
           if(!temConteudo) return;
 
           if(filtroAgregadoMes && filtroAgregadoMes !== m) return;
