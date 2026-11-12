@@ -134,14 +134,11 @@ body.qc-body {
 #qc-btn-instalar { background: rgba(255,255,255,.15); }
 #qc-btn-instalar:hover { background: rgba(255,255,255,.3); }
 
-/* Botão que recolhe/expande a sidebar no desktop. Agora que a sidebar fica
-   por cima do conteúdo em vez de empurrá-lo (.qc-main não reserva mais
-   espaço pra ela), esse botão precisa ficar fixo numa posição que a
-   sidebar NUNCA cobre — por isso "position:fixed" logo depois da borda
-   direita dela (--qc-sidebar-width + um respiro), sempre no mesmo lugar
-   da tela, mostrada ou recolhida. Nasce dentro de .qc-main só por
-   conveniência de marcação (fica perto do topo do conteúdo no código),
-   mas visualmente não depende de nada do fluxo normal do conteúdo. */
+/* Botão que recolhe/expande a sidebar no desktop. "position:fixed" (em vez
+   de nascer dentro do fluxo normal de .qc-main) pra ele ficar sempre
+   visível e no mesmo lugar relativo à sidebar, acompanhando o "left" dela
+   com a mesma transição suave de .qc-main — desliza junto quando
+   recolhe/expande, sem depender de recalcular posição dentro do conteúdo. */
 .qc-sidebar-colapsar {
   display: inline-flex;
   align-items: center;
@@ -165,6 +162,7 @@ body.qc-sidebar-recolhida .qc-sidebar-colapsar { left: 14px; }
 .qc-sidebar-colapsar:hover { background: var(--qc-primary); color: #fff; border-color: var(--qc-primary); }
 
 body.qc-sidebar-recolhida .qc-sidebar { transform: translateX(-100%); }
+body.qc-sidebar-recolhida .qc-main { margin-left: 0; }
 
 /* Hamburger (mobile) */
 .qc-sidebar-toggle {
@@ -181,18 +179,15 @@ body.qc-sidebar-recolhida .qc-sidebar { transform: translateX(-100%); }
   cursor: pointer;
 }
 
-/* A sidebar (acima, position:fixed) fica por cima do conteúdo, não ao lado
-   dele — de propósito: o conteúdo nunca muda de lugar nem de tamanho quando
-   a sidebar aparece/some, só a sidebar desliza por cima. Antes, mostrar a
-   sidebar empurrava o conteúdo pra direita (margin-left reservando o espaço
-   dela) e escondê-la "soltava" tudo de volta — ficava com um salto toda
-   vez que recolhia/expandia. Agora o conteúdo já fica sempre na posição
-   "larga" (a mesma de quando a sidebar está recolhida); com a sidebar
-   visível, ela só cobre por cima a faixa da esquerda enquanto estiver
-   aberta. */
+/* O conteúdo ENCOLHE pra caber no espaço que sobra ao lado da sidebar —
+   nunca fica por baixo dela, coberto/escondido. Com a sidebar visível,
+   reserva o espaço dela (margin-left); recolhendo, o conteúdo volta a
+   ocupar a largura toda (ver "body.qc-sidebar-recolhida .qc-main" mais
+   abaixo). */
 .qc-main {
   flex: 1;
-  margin-left: 0;
+  margin-left: var(--qc-sidebar-width);
+  transition: margin-left .25s ease;
   min-height: 100vh;
   padding: 22px 28px 50px;
   max-width: 100%;
