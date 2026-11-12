@@ -48,11 +48,16 @@
   .btn-sm { padding: 5px 10px; font-size: 12px; }
   .btn-group { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 
-  .table-wrapper { overflow-x: auto; max-width: 100%; border: 1px solid #ddd; border-radius: 6px; background: white; margin-top: 10px; scrollbar-width: auto; }
-  .table-wrapper::-webkit-scrollbar { height: 14px; }
-  .table-wrapper::-webkit-scrollbar-track { background: #f1f1f1; }
-  .table-wrapper::-webkit-scrollbar-thumb { background: #aaa; border-radius: 7px; }
-  .table-wrapper::-webkit-scrollbar-thumb:hover { background: #888; }
+  /* A barra de rolagem de VERDADE dessa tabela larga é só a "fantasma"
+     (#rv-scroll-ghost, fixa embaixo da tela — ver o bloco de CSS e o script
+     dela mais abaixo) — ela some/aparece e acompanha o scroll da página
+     sozinha. Aqui escondemos a barra NATIVA do .table-wrapper (ela continua
+     existindo e rolando por baixo dos panos, só não aparece pro usuário)
+     pra não ficarem duas barras de rolagem fazendo a mesma coisa, uma presa
+     embaixo da tabela (que some da tela quando rola a página) e outra fixa
+     na janela — só a fixa é visível, e arrastar ela move a tabela também. */
+  .table-wrapper { overflow-x: auto; max-width: 100%; border: 1px solid #ddd; border-radius: 6px; background: white; margin-top: 10px; scrollbar-width: none; }
+  .table-wrapper::-webkit-scrollbar { display: none; }
   table.rv-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 1350px; }
   table.rv-table th { background: var(--qc-primary); padding: 10px 8px; text-align: right; font-weight: 600; color: white; white-space: nowrap; position: sticky; top: 0; z-index: 2; }
   table.rv-table td { padding: 8px 8px; border-bottom: 1px solid #eee; vertical-align: middle; white-space: nowrap; color: #444; text-align: right; }

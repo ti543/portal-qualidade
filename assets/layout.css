@@ -134,15 +134,22 @@ body.qc-body {
 #qc-btn-instalar { background: rgba(255,255,255,.15); }
 #qc-btn-instalar:hover { background: rgba(255,255,255,.3); }
 
-/* Botão que recolhe/expande a sidebar no desktop. Fica dentro da .qc-main
-   (não fixo, não dentro da sidebar) de propósito: assim ele nunca some —
-   não depende de nenhuma posição fixa que possa colidir com a barra de
-   rolagem da sidebar ou "viajar" junto com ela quando ela é escondida. */
+/* Botão que recolhe/expande a sidebar no desktop. Agora que a sidebar fica
+   por cima do conteúdo em vez de empurrá-lo (.qc-main não reserva mais
+   espaço pra ela), esse botão precisa ficar fixo numa posição que a
+   sidebar NUNCA cobre — por isso "position:fixed" logo depois da borda
+   direita dela (--qc-sidebar-width + um respiro), sempre no mesmo lugar
+   da tela, mostrada ou recolhida. Nasce dentro de .qc-main só por
+   conveniência de marcação (fica perto do topo do conteúdo no código),
+   mas visualmente não depende de nada do fluxo normal do conteúdo. */
 .qc-sidebar-colapsar {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 14px;
+  position: fixed;
+  top: 14px;
+  left: calc(var(--qc-sidebar-width) + 14px);
+  z-index: 55;
   padding: 7px 14px;
   border-radius: 20px;
   background: #fff;
@@ -152,13 +159,12 @@ body.qc-body {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  transition: background .2s, color .2s, border-color .2s;
+  transition: background .2s, color .2s, border-color .2s, left .25s ease;
 }
+body.qc-sidebar-recolhida .qc-sidebar-colapsar { left: 14px; }
 .qc-sidebar-colapsar:hover { background: var(--qc-primary); color: #fff; border-color: var(--qc-primary); }
 
-.qc-main { transition: margin-left .25s ease; }
 body.qc-sidebar-recolhida .qc-sidebar { transform: translateX(-100%); }
-body.qc-sidebar-recolhida .qc-main { margin-left: 0; }
 
 /* Hamburger (mobile) */
 .qc-sidebar-toggle {
@@ -175,9 +181,18 @@ body.qc-sidebar-recolhida .qc-main { margin-left: 0; }
   cursor: pointer;
 }
 
+/* A sidebar (acima, position:fixed) fica por cima do conteúdo, não ao lado
+   dele — de propósito: o conteúdo nunca muda de lugar nem de tamanho quando
+   a sidebar aparece/some, só a sidebar desliza por cima. Antes, mostrar a
+   sidebar empurrava o conteúdo pra direita (margin-left reservando o espaço
+   dela) e escondê-la "soltava" tudo de volta — ficava com um salto toda
+   vez que recolhia/expandia. Agora o conteúdo já fica sempre na posição
+   "larga" (a mesma de quando a sidebar está recolhida); com a sidebar
+   visível, ela só cobre por cima a faixa da esquerda enquanto estiver
+   aberta. */
 .qc-main {
   flex: 1;
-  margin-left: var(--qc-sidebar-width);
+  margin-left: 0;
   min-height: 100vh;
   padding: 22px 28px 50px;
   max-width: 100%;
