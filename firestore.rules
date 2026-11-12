@@ -238,5 +238,19 @@ service cloud.firestore {
         (request.resource.data.unidade == minhaUnidade() || souQualidade());
       allow update, delete: if temPermissao("resultado-veiculo") && souQualidade();
     }
+
+    // ------------------------------------------------------------------
+    // RG09 — CONTROLE DE DISTRIBUIÇÃO DE DOCUMENTOS DO SGQ (exclusivo qualidade)
+    // ------------------------------------------------------------------
+    match /rg09_distribuicao/{id} {
+      allow read, write: if souQualidade();
+    }
+
+    // ------------------------------------------------------------------
+    // RG10 — CONTROLE DE REQUISITOS LEGAIS APLICÁVEIS (exclusivo qualidade)
+    // ------------------------------------------------------------------
+    match /rg10_requisitos_legais/{id} {
+      allow read, write: if souQualidade();
+    }
   }
 }

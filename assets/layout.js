@@ -26,6 +26,8 @@ const ICONES_MODULO = {
   'aprovacao-documentos': 'bi-file-earmark-check-fill',
   'documentos': 'bi-folder2-open',
   'resultado-veiculo': 'bi-truck',
+  'rg09': 'bi-send-fill',
+  'rg10': 'bi-shield-check',
 };
 
 export function escapeHtml(str) {

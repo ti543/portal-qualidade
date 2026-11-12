@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RG 09 - Controle de Distribuição de Documentos</title>
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
+<!-- Fonte "Inter" via Google Fonts — garante que o app pareça igual em
+     qualquer aparelho (PC, celular, Windows, Mac, Android...), em vez de
+     depender da fonte "Segoe UI" instalada no computador (só existe no
+     Windows; em outro sistema o navegador troca sozinho por uma fonte de
+     reserva diferente, e as letras saem com outra cara). Continua tendo
+     o stack antigo como reserva (abaixo, no CSS) caso a internet falhe
+     bem na hora de abrir. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/layout.css" rel="stylesheet">
+    <style>
+        /* Estilos específicos deste módulo. O resto (sidebar, topbar, cards,
+           botões, seções) vem de assets/layout.css. */
+
+        .nav-tabs .nav-link {
+            color: #555;
+            font-weight: 600;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--qc-primary) !important;
+            border-top: 3px solid var(--qc-primary);
+        }
+
+        /* Mini-grade de "cópia física" — uma unidade por linha, com uma
+           caixinha pra Escritório e outra pra Depósito. Fica compacta mesmo
+           com as 6 unidades, pra não virar um formulário gigante. */
+        .grade-copias {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+        }
+        .grade-copias-item {
+            background: #f8f9fa;
+            border: 1px solid #e3e3e3;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .grade-copias-item .unidade-nome {
+            font-weight: 700;
+            font-size: 0.82rem;
+            color: var(--qc-primary);
+            display: block;
+            margin-bottom: 4px;
+        }
+        .grade-copias-item label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: #555;
+            margin-bottom: 2px;
+        }
+
+        .selo-copias-fisicas {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+        .selo-copias-fisicas .badge { font-size: 0.68rem; }
+    </style>
+</head>
+<body class="qc-body">
+
+    <div id="qc-page-content">
+
+            <ul class="nav nav-tabs mb-4" id="moduleTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="cadastro-tab" data-bs-toggle="tab" data-bs-target="#cadastro-panel" type="button" role="tab"><i class="bi bi-file-earmark-plus-fill me-2"></i>Cadastro</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="controle-tab" data-bs-toggle="tab" data-bs-target="#controle-panel" type="button" role="tab"><i class="bi bi-table me-2"></i>Controle</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="moduleTabsContent">
+
+                <div class="tab-pane fade show active" id="cadastro-panel" role="tabpanel">
+                    <form id="form-documento" class="card shadow-sm">
+                        <input type="hidden" id="doc-id">
+
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Código do Documento</label>
+                                    <input type="text" id="codigo" class="form-control" placeholder="Ex: MQ 01, PG 03, IT 02" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Nº da Revisão</label>
+                                    <input type="text" id="revisao" class="form-control" placeholder="Ex: 00, 01, 02" required>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">Título</label>
+                                    <input type="text" id="titulo" class="form-control" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Data da Elaboração/Revisão</label>
+                                    <input type="date" id="dataRevisao" class="form-control" required>
+                                </div>
+                            </div>
+
+                            <div class="qc-section-title">CÓPIA ELETRÔNICA</div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="copiaEletronica" checked>
+                                <label class="form-check-label" for="copiaEletronica">Existe cópia eletrônica deste documento disponível</label>
+                            </div>
+
+                            <div class="qc-section-title">CÓPIA FÍSICA — POR UNIDADE</div>
+                            <p class="qc-hint">Marque só onde existir mesmo uma cópia impressa guardada. Pode marcar Escritório, Depósito, os dois ou nenhum, em cada unidade.</p>
+                            <div class="grade-copias" id="grade-copias"></div>
+
+                        </div>
+                        <div class="card-footer d-flex justify-content-between">
+                            <div>
+                                <button type="button" class="btn btn-outline-secondary me-2" id="btn-limpar"><i class="bi bi-eraser-fill me-2"></i>Limpar / Novo</button>
+                                <button type="button" class="btn btn-outline-danger" id="btn-excluir-form" style="display: none;"><i class="bi bi-trash-fill me-2"></i>Excluir Registro</button>
+                            </div>
+                            <button type="submit" class="qc-btn qc-btn-primary px-5"><i class="bi bi-cloud-check-fill me-2"></i>Salvar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="tab-pane fade" id="controle-panel" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="row mb-3 g-2">
+                                <div class="col-md-8">
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input type="text" id="txt-busca" class="form-control" placeholder="Buscar por código ou título...">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <select id="filtro-eletronica" class="form-select">
+                                        <option value="">Cópia eletrônica: todos</option>
+                                        <option value="sim">Só com cópia eletrônica</option>
+                                        <option value="nao">Só sem cópia eletrônica</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-striped border">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 10%;">Código</th>
+                                            <th>Título</th>
+                                            <th style="width: 8%;">Revisão</th>
+                                            <th style="width: 11%;">Data</th>
+                                            <th style="width: 8%;">Eletrônica</th>
+                                            <th style="width: 28%;">Cópias Físicas</th>
+                                            <th style="width: 10%; text-align: center;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabela-controle-corpo">
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+    </div>
+
+    <script type="module">
+        import { auth, db } from '../firebase-config.js';
+        import { doc, setDoc, collection, query, getDocs, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { initLayout, escapeHtml } from '../assets/layout.js';
+
+        // As mesmas 6 unidades usadas no resto do sistema (fora a MTZ/matriz,
+        // que não aparece na planilha original de distribuição física).
+        const UNIDADES = [
+            { sigla: 'GRU', nome: 'GRU' },
+            { sigla: 'RSL', nome: 'RSL' },
+            { sigla: 'ITJ', nome: 'ITJ' },
+            { sigla: 'CTB', nome: 'CTB' },
+            { sigla: 'POA', nome: 'POA' },
+            { sigla: 'CMP', nome: 'CMP' },
+        ];
+
+        let documentosCarregados = [];
+
+        initLayout({
+            auth, db,
+            activeSlug: 'rg09',
+            pageTitle: 'RG 09 - Controle de Distribuição de Documentos do SGQ',
+            breadcrumb: 'Qualidade',
+            isoDocId: 'iso_rg09',
+            homeHref: '../index.html',
+            papelExigido: 'qualidade'
+        }).then(() => {
+            definirDataDeHoje();
+            montarGradeCopias();
+            carregarPainelControle();
+        }).catch(err => console.error('Falha ao montar layout:', err));
+
+        function definirDataDeHoje() {
+            document.getElementById('dataRevisao').value = new Date().toISOString().split('T')[0];
+        }
+
+        // Monta as 6 caixinhas (uma por unidade) com os dois checkboxes
+        // (Escritório / Depósito) dentro — em vez de escrever as 12 caixas
+        // na mão no HTML.
+        function montarGradeCopias() {
+            const grade = document.getElementById('grade-copias');
+            grade.innerHTML = UNIDADES.map(u => `
+                <div class="grade-copias-item">
+                    <span class="unidade-nome">${escapeHtml(u.nome)}</span>
+                    <label><input type="checkbox" class="chk-copia-fisica" data-unidade="${u.sigla}" data-local="escritorio"> Escritório</label>
+                    <label><input type="checkbox" class="chk-copia-fisica" data-unidade="${u.sigla}" data-local="deposito"> Depósito</label>
+                </div>
+            `).join('');
+        }
+
+        function lerCopiasFisicasDoFormulario() {
+            const copias = {};
+            UNIDADES.forEach(u => {
+                const escritorio = document.querySelector(`.chk-copia-fisica[data-unidade="${u.sigla}"][data-local="escritorio"]`).checked;
+                const deposito = document.querySelector(`.chk-copia-fisica[data-unidade="${u.sigla}"][data-local="deposito"]`).checked;
+                copias[u.sigla] = { escritorio, deposito };
+            });
+            return copias;
+        }
+
+        function preencherCopiasFisicasNoFormulario(copias) {
+            copias = copias || {};
+            UNIDADES.forEach(u => {
+                const c = copias[u.sigla] || {};
+                document.querySelector(`.chk-copia-fisica[data-unidade="${u.sigla}"][data-local="escritorio"]`).checked = !!c.escritorio;
+                document.querySelector(`.chk-copia-fisica[data-unidade="${u.sigla}"][data-local="deposito"]`).checked = !!c.deposito;
+            });
+        }
+
+        // O código do documento (ex: "MQ 01") é a própria chave do registro,
+        // igual já acontece com placas em veiculos_frota — não existe
+        // "número de registro" automático aqui, é o código que identifica.
+        function slugificarCodigo(codigo) {
+            return codigo.trim().toUpperCase().replace(/\s+/g, '-');
+        }
+
+        document.getElementById('form-documento').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const idAntigo = document.getElementById('doc-id').value;
+            const codigo = document.getElementById('codigo').value;
+            const novoId = slugificarCodigo(codigo);
+
+            const dados = {
+                id: novoId,
+                codigo,
+                revisao: document.getElementById('revisao').value,
+                titulo: document.getElementById('titulo').value,
+                dataRevisao: document.getElementById('dataRevisao').value,
+                copiaEletronica: document.getElementById('copiaEletronica').checked,
+                copiasFisicas: lerCopiasFisicasDoFormulario(),
+                atualizadoEm: new Date().toISOString()
+            };
+
+            try {
+                // Se o código mudou (ex: corrigindo um erro de digitação), o
+                // registro antigo (com o ID baseado no código velho) precisa
+                // ser removido, senão fica um "fantasma" duplicado.
+                if (idAntigo && idAntigo !== novoId) {
+                    await deleteDoc(doc(db, 'rg09_distribuicao', idAntigo));
+                }
+                await setDoc(doc(db, 'rg09_distribuicao', novoId), dados);
+                alert('Documento salvo com sucesso!');
+                limparFormulario();
+                carregarPainelControle();
+            } catch (error) {
+                console.error(error);
+                alert('Erro ao salvar! Verifique as regras de segurança.');
+            }
+        });
+
+        async function deletarRegistro(id, codigo) {
+            if (confirm(`Tem certeza absoluta que deseja excluir o documento "${codigo || ''}" do controle de distribuição? Esta operação não poderá ser desfeita.`)) {
+                try {
+                    await deleteDoc(doc(db, 'rg09_distribuicao', id));
+                    alert('Documento excluído com sucesso!');
+                    limparFormulario();
+                    carregarPainelControle();
+                } catch (error) {
+                    console.error('Erro ao deletar:', error);
+                    alert('Erro ao tentar excluir o documento do Firestore.');
+                }
+            }
+        }
+
+        document.getElementById('btn-excluir-form').addEventListener('click', () => {
+            const currentId = document.getElementById('doc-id').value;
+            const currentCodigo = document.getElementById('codigo').value;
+            if (currentId) deletarRegistro(currentId, currentCodigo);
+        });
+
+        async function carregarPainelControle() {
+            try {
+                const q = query(collection(db, 'rg09_distribuicao'), orderBy('codigo'));
+                const querySnapshot = await getDocs(q);
+                documentosCarregados = [];
+                querySnapshot.forEach(docSnap => documentosCarregados.push(docSnap.data()));
+                renderizarTabelaControle(documentosCarregados);
+            } catch (e) { console.error(e); }
+        }
+
+        function selosCopiasFisicas(copias) {
+            copias = copias || {};
+            const marcadas = [];
+            UNIDADES.forEach(u => {
+                const c = copias[u.sigla] || {};
+                if (c.escritorio) marcadas.push(`${u.sigla} Escrit.`);
+                if (c.deposito) marcadas.push(`${u.sigla} Depós.`);
+            });
+            if (marcadas.length === 0) return '<span class="text-muted">—</span>';
+            return `<span class="selo-copias-fisicas">${marcadas.map(m => `<span class="badge bg-secondary">${escapeHtml(m)}</span>`).join('')}</span>`;
+        }
+
+        function renderizarTabelaControle(dados) {
+            const corpo = document.getElementById('tabela-controle-corpo');
+            corpo.innerHTML = '';
+            dados.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fw-bold">${escapeHtml(item.codigo || '')}</td>
+                    <td class="text-truncate" style="max-width: 320px;">${escapeHtml(item.titulo || '')}</td>
+                    <td class="text-center">${escapeHtml(item.revisao || '')}</td>
+                    <td>${item.dataRevisao ? new Date(item.dataRevisao + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</td>
+                    <td class="text-center">${item.copiaEletronica ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-dash-circle text-muted"></i>'}</td>
+                    <td>${selosCopiasFisicas(item.copiasFisicas)}</td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary btn-abrir" data-id="${item.id}" title="Editar"><i class="bi bi-pencil-square"></i></button>
+                            <button class="btn btn-outline-danger btn-excluir-tabela" data-id="${item.id}" data-codigo="${escapeHtml(item.codigo)}" title="Excluir"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                `;
+                tr.querySelector('.btn-abrir').addEventListener('click', () => abrirParaEdicao(item.id));
+                tr.querySelector('.btn-excluir-tabela').addEventListener('click', (ev) => {
+                    const el = ev.currentTarget;
+                    deletarRegistro(el.dataset.id, el.dataset.codigo);
+                });
+                corpo.appendChild(tr);
+            });
+        }
+
+        function abrirParaEdicao(id) {
+            const item = documentosCarregados.find(d => d.id === id);
+            if (!item) return;
+
+            document.getElementById('doc-id').value = item.id;
+            document.getElementById('codigo').value = item.codigo || '';
+            document.getElementById('revisao').value = item.revisao || '';
+            document.getElementById('titulo').value = item.titulo || '';
+            document.getElementById('dataRevisao').value = item.dataRevisao || '';
+            document.getElementById('copiaEletronica').checked = item.copiaEletronica !== false;
+            preencherCopiasFisicasNoFormulario(item.copiasFisicas);
+
+            document.getElementById('btn-excluir-form').style.display = 'inline-block';
+
+            const firstTab = new bootstrap.Tab(document.getElementById('cadastro-tab'));
+            firstTab.show();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function filtrarTabela() {
+            const termo = document.getElementById('txt-busca').value.toLowerCase();
+            const filtroEletronica = document.getElementById('filtro-eletronica').value;
+
+            const filtrados = documentosCarregados.filter(item => {
+                const cod = (item.codigo || '').toLowerCase();
+                const titulo = (item.titulo || '').toLowerCase();
+
+                const atendeBusca = cod.includes(termo) || titulo.includes(termo);
+                const atendeEletronica = !filtroEletronica
+                    || (filtroEletronica === 'sim' && item.copiaEletronica)
+                    || (filtroEletronica === 'nao' && !item.copiaEletronica);
+
+                return atendeBusca && atendeEletronica;
+            });
+
+            renderizarTabelaControle(filtrados);
+        }
+
+        document.getElementById('txt-busca').addEventListener('input', filtrarTabela);
+        document.getElementById('filtro-eletronica').addEventListener('change', filtrarTabela);
+        document.getElementById('controle-tab').addEventListener('click', carregarPainelControle);
+
+        function limparFormulario() {
+            document.getElementById('form-documento').reset();
+            document.getElementById('doc-id').value = '';
+            document.getElementById('copiaEletronica').checked = true;
+            preencherCopiasFisicasNoFormulario({});
+            document.getElementById('btn-excluir-form').style.display = 'none';
+            definirDataDeHoje();
+        }
+
+        document.getElementById('btn-limpar').addEventListener('click', limparFormulario);
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

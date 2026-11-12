@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RG 10 - Controle de Requisitos Legais</title>
+<link rel="icon" href="../assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
+<!-- Fonte "Inter" via Google Fonts — garante que o app pareça igual em
+     qualquer aparelho (PC, celular, Windows, Mac, Android...), em vez de
+     depender da fonte "Segoe UI" instalada no computador (só existe no
+     Windows; em outro sistema o navegador troca sozinho por uma fonte de
+     reserva diferente, e as letras saem com outra cara). Continua tendo
+     o stack antigo como reserva (abaixo, no CSS) caso a internet falhe
+     bem na hora de abrir. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/layout.css" rel="stylesheet">
+    <style>
+        /* Estilos específicos deste módulo. O resto (sidebar, topbar, cards,
+           botões, seções) vem de assets/layout.css. */
+
+        .nav-tabs .nav-link {
+            color: #555;
+            font-weight: 600;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--qc-primary) !important;
+            border-top: 3px solid var(--qc-primary);
+        }
+
+        .cartao-resumo {
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .cartao-resumo i { font-size: 1.6rem; }
+        .cartao-resumo .numero { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+        .cartao-resumo .rotulo { font-size: 0.78rem; color: #666; }
+        .cartao-resumo.vencido { background: #fdeaea; }
+        .cartao-resumo.vencido i, .cartao-resumo.vencido .numero { color: #c0392b; }
+        .cartao-resumo.proximo { background: #fff6e0; }
+        .cartao-resumo.proximo i, .cartao-resumo.proximo .numero { color: #b98900; }
+        .cartao-resumo.emdia { background: #e8f6ee; }
+        .cartao-resumo.emdia i, .cartao-resumo.emdia .numero { color: #1e8e5a; }
+
+        tr.linha-vencido { background: #fdeaea !important; }
+        tr.linha-proximo { background: #fff6e0 !important; }
+    </style>
+</head>
+<body class="qc-body">
+
+    <div id="qc-page-content">
+
+            <ul class="nav nav-tabs mb-4" id="moduleTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="cadastro-tab" data-bs-toggle="tab" data-bs-target="#cadastro-panel" type="button" role="tab"><i class="bi bi-file-earmark-plus-fill me-2"></i>Cadastro</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="controle-tab" data-bs-toggle="tab" data-bs-target="#controle-panel" type="button" role="tab"><i class="bi bi-table me-2"></i>Controle</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="moduleTabsContent">
+
+                <div class="tab-pane fade show active" id="cadastro-panel" role="tabpanel">
+                    <form id="form-requisito" class="card shadow-sm">
+                        <input type="hidden" id="req-id">
+
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Tipo de Legislação</label>
+                                    <input type="text" id="tipoLegislacao" class="form-control" placeholder="Ex: Alvará, Licença Ambiental, Lei..." required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Órgão Emissor</label>
+                                    <input type="text" id="orgaoEmissor" class="form-control" placeholder="Ex: IBAMA, FEPAM, Prefeitura..." required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Número</label>
+                                    <input type="text" id="numero" class="form-control">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Data de Revisão</label>
+                                    <input type="date" id="dataRevisao" class="form-control">
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-12">
+                                    <label class="form-label">Título</label>
+                                    <input type="text" id="titulo" class="form-control" required>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-4">
+                                    <label class="form-label">Local de Manutenção</label>
+                                    <input type="text" id="localManutencao" class="form-control" placeholder="Onde o documento fica guardado">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Responsável</label>
+                                    <input type="text" id="responsavel" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Prazo para Atualização</label>
+                                    <input type="date" id="prazoAtualizacao" class="form-control" required>
+                                </div>
+                            </div>
+
+                        </div>
+                        <div class="card-footer d-flex justify-content-between">
+                            <div>
+                                <button type="button" class="btn btn-outline-secondary me-2" id="btn-limpar"><i class="bi bi-eraser-fill me-2"></i>Limpar / Novo</button>
+                                <button type="button" class="btn btn-outline-danger" id="btn-excluir-form" style="display: none;"><i class="bi bi-trash-fill me-2"></i>Excluir Registro</button>
+                            </div>
+                            <button type="submit" class="qc-btn qc-btn-primary px-5"><i class="bi bi-cloud-check-fill me-2"></i>Salvar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="tab-pane fade" id="controle-panel" role="tabpanel">
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="cartao-resumo vencido">
+                                <i class="bi bi-exclamation-octagon-fill"></i>
+                                <div>
+                                    <div class="numero" id="resumo-vencidos">0</div>
+                                    <div class="rotulo">Vencidos — precisa atualizar já</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="cartao-resumo proximo">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                <div>
+                                    <div class="numero" id="resumo-proximos">0</div>
+                                    <div class="rotulo">Vencem nos próximos 30 dias</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="cartao-resumo emdia">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <div>
+                                    <div class="numero" id="resumo-emdia">0</div>
+                                    <div class="rotulo">Em dia</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="row mb-3 g-2">
+                                <div class="col-md-7">
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input type="text" id="txt-busca" class="form-control" placeholder="Buscar por tipo, órgão, número ou título...">
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <select id="filtro-situacao" class="form-select">
+                                        <option value="">Situação: todas</option>
+                                        <option value="vencido">Só vencidos</option>
+                                        <option value="proximo">Só próximos do vencimento</option>
+                                        <option value="emdia">Só em dia</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-striped border">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 11%;">Tipo</th>
+                                            <th style="width: 13%;">Órgão Emissor</th>
+                                            <th style="width: 10%;">Número</th>
+                                            <th>Título</th>
+                                            <th style="width: 11%;">Responsável</th>
+                                            <th style="width: 10%;">Prazo</th>
+                                            <th style="width: 10%;">Situação</th>
+                                            <th style="width: 9%; text-align: center;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabela-controle-corpo">
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+    </div>
+
+    <script type="module">
+        import { auth, db } from '../firebase-config.js';
+        import { doc, setDoc, collection, query, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { initLayout, escapeHtml } from '../assets/layout.js';
+
+        const DIAS_PARA_ALERTA = 30;
+
+        let requisitosCarregados = [];
+
+        initLayout({
+            auth, db,
+            activeSlug: 'rg10',
+            pageTitle: 'RG 10 - Controle de Requisitos Legais Aplicáveis',
+            breadcrumb: 'Qualidade',
+            isoDocId: 'iso_rg10',
+            homeHref: '../index.html',
+            papelExigido: 'qualidade'
+        }).then(() => {
+            carregarPainelControle();
+        }).catch(err => console.error('Falha ao montar layout:', err));
+
+        // Compara só a DATA (sem hora), pra "vence hoje" não virar "já venceu"
+        // por causa da hora atual.
+        function hojeSemHora() {
+            const h = new Date();
+            return new Date(h.getFullYear(), h.getMonth(), h.getDate());
+        }
+
+        function diasAteOPrazo(prazoISO) {
+            if (!prazoISO) return null;
+            const [ano, mes, dia] = prazoISO.split('-').map(Number);
+            const prazo = new Date(ano, mes - 1, dia);
+            const diffMs = prazo.getTime() - hojeSemHora().getTime();
+            return Math.round(diffMs / 86400000);
+        }
+
+        function situacaoDoPrazo(prazoISO) {
+            const dias = diasAteOPrazo(prazoISO);
+            if (dias === null) return 'emdia';
+            if (dias < 0) return 'vencido';
+            if (dias <= DIAS_PARA_ALERTA) return 'proximo';
+            return 'emdia';
+        }
+
+        function seloDaSituacao(situacao, dias) {
+            if (situacao === 'vencido') {
+                return `<span class="qc-status-badge bg-danger text-white">Vencido há ${Math.abs(dias)} dia(s)</span>`;
+            }
+            if (situacao === 'proximo') {
+                return `<span class="qc-status-badge bg-warning text-dark">Vence em ${dias} dia(s)</span>`;
+            }
+            return `<span class="qc-status-badge bg-success text-white">Em dia</span>`;
+        }
+
+        document.getElementById('form-requisito').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            let id = document.getElementById('req-id').value;
+            const ehRegistroNovo = !id;
+            if (ehRegistroNovo) id = 'RG10-' + Date.now();
+
+            const dados = {
+                id,
+                tipoLegislacao: document.getElementById('tipoLegislacao').value,
+                orgaoEmissor: document.getElementById('orgaoEmissor').value,
+                numero: document.getElementById('numero').value,
+                titulo: document.getElementById('titulo').value,
+                dataRevisao: document.getElementById('dataRevisao').value,
+                localManutencao: document.getElementById('localManutencao').value,
+                responsavel: document.getElementById('responsavel').value,
+                prazoAtualizacao: document.getElementById('prazoAtualizacao').value,
+                atualizadoEm: new Date().toISOString()
+            };
+
+            try {
+                await setDoc(doc(db, 'rg10_requisitos_legais', id), dados);
+                alert('Requisito legal salvo com sucesso!');
+                limparFormulario();
+                carregarPainelControle();
+            } catch (error) {
+                console.error(error);
+                alert('Erro ao salvar! Verifique as regras de segurança.');
+            }
+        });
+
+        async function deletarRegistro(id, titulo) {
+            if (confirm(`Tem certeza absoluta que deseja excluir o requisito "${titulo || ''}"? Esta operação não poderá ser desfeita.`)) {
+                try {
+                    await deleteDoc(doc(db, 'rg10_requisitos_legais', id));
+                    alert('Requisito excluído com sucesso!');
+                    limparFormulario();
+                    carregarPainelControle();
+                } catch (error) {
+                    console.error('Erro ao deletar:', error);
+                    alert('Erro ao tentar excluir o requisito do Firestore.');
+                }
+            }
+        }
+
+        document.getElementById('btn-excluir-form').addEventListener('click', () => {
+            const currentId = document.getElementById('req-id').value;
+            const currentTitulo = document.getElementById('titulo').value;
+            if (currentId) deletarRegistro(currentId, currentTitulo);
+        });
+
+        async function carregarPainelControle() {
+            try {
+                const q = query(collection(db, 'rg10_requisitos_legais'));
+                const querySnapshot = await getDocs(q);
+                requisitosCarregados = [];
+                querySnapshot.forEach(docSnap => requisitosCarregados.push(docSnap.data()));
+                // Mais urgente primeiro (prazo mais próximo/mais vencido no topo).
+                requisitosCarregados.sort((a, b) => (a.prazoAtualizacao || '9999-99-99').localeCompare(b.prazoAtualizacao || '9999-99-99'));
+                renderizarTabelaControle(requisitosCarregados);
+                atualizarResumo(requisitosCarregados);
+            } catch (e) { console.error(e); }
+        }
+
+        function atualizarResumo(dados) {
+            let vencidos = 0, proximos = 0, emDia = 0;
+            dados.forEach(item => {
+                const s = situacaoDoPrazo(item.prazoAtualizacao);
+                if (s === 'vencido') vencidos++;
+                else if (s === 'proximo') proximos++;
+                else emDia++;
+            });
+            document.getElementById('resumo-vencidos').textContent = vencidos;
+            document.getElementById('resumo-proximos').textContent = proximos;
+            document.getElementById('resumo-emdia').textContent = emDia;
+        }
+
+        function renderizarTabelaControle(dados) {
+            const corpo = document.getElementById('tabela-controle-corpo');
+            corpo.innerHTML = '';
+            dados.forEach(item => {
+                const dias = diasAteOPrazo(item.prazoAtualizacao);
+                const situacao = situacaoDoPrazo(item.prazoAtualizacao);
+
+                const tr = document.createElement('tr');
+                if (situacao === 'vencido') tr.classList.add('linha-vencido');
+                else if (situacao === 'proximo') tr.classList.add('linha-proximo');
+
+                tr.innerHTML = `
+                    <td>${escapeHtml(item.tipoLegislacao || '')}</td>
+                    <td>${escapeHtml(item.orgaoEmissor || '')}</td>
+                    <td>${escapeHtml(item.numero || '')}</td>
+                    <td class="text-truncate" style="max-width: 280px;">${escapeHtml(item.titulo || '')}</td>
+                    <td>${escapeHtml(item.responsavel || '')}</td>
+                    <td>${item.prazoAtualizacao ? new Date(item.prazoAtualizacao + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                    <td>${seloDaSituacao(situacao, dias)}</td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary btn-abrir" data-id="${item.id}" title="Editar"><i class="bi bi-pencil-square"></i></button>
+                            <button class="btn btn-outline-danger btn-excluir-tabela" data-id="${item.id}" data-titulo="${escapeHtml(item.titulo)}" title="Excluir"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                `;
+                tr.querySelector('.btn-abrir').addEventListener('click', () => abrirParaEdicao(item.id));
+                tr.querySelector('.btn-excluir-tabela').addEventListener('click', (ev) => {
+                    const el = ev.currentTarget;
+                    deletarRegistro(el.dataset.id, el.dataset.titulo);
+                });
+                corpo.appendChild(tr);
+            });
+        }
+
+        function abrirParaEdicao(id) {
+            const item = requisitosCarregados.find(d => d.id === id);
+            if (!item) return;
+
+            document.getElementById('req-id').value = item.id;
+            document.getElementById('tipoLegislacao').value = item.tipoLegislacao || '';
+            document.getElementById('orgaoEmissor').value = item.orgaoEmissor || '';
+            document.getElementById('numero').value = item.numero || '';
+            document.getElementById('titulo').value = item.titulo || '';
+            document.getElementById('dataRevisao').value = item.dataRevisao || '';
+            document.getElementById('localManutencao').value = item.localManutencao || '';
+            document.getElementById('responsavel').value = item.responsavel || '';
+            document.getElementById('prazoAtualizacao').value = item.prazoAtualizacao || '';
+
+            document.getElementById('btn-excluir-form').style.display = 'inline-block';
+
+            const firstTab = new bootstrap.Tab(document.getElementById('cadastro-tab'));
+            firstTab.show();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function filtrarTabela() {
+            const termo = document.getElementById('txt-busca').value.toLowerCase();
+            const filtroSituacao = document.getElementById('filtro-situacao').value;
+
+            const filtrados = requisitosCarregados.filter(item => {
+                const tipo = (item.tipoLegislacao || '').toLowerCase();
+                const orgao = (item.orgaoEmissor || '').toLowerCase();
+                const numero = (item.numero || '').toLowerCase();
+                const titulo = (item.titulo || '').toLowerCase();
+
+                const atendeBusca = tipo.includes(termo) || orgao.includes(termo) || numero.includes(termo) || titulo.includes(termo);
+                const atendeSituacao = !filtroSituacao || situacaoDoPrazo(item.prazoAtualizacao) === filtroSituacao;
+
+                return atendeBusca && atendeSituacao;
+            });
+
+            renderizarTabelaControle(filtrados);
+        }
+
+        document.getElementById('txt-busca').addEventListener('input', filtrarTabela);
+        document.getElementById('filtro-situacao').addEventListener('change', filtrarTabela);
+        document.getElementById('controle-tab').addEventListener('click', carregarPainelControle);
+
+        function limparFormulario() {
+            document.getElementById('form-requisito').reset();
+            document.getElementById('req-id').value = '';
+            document.getElementById('btn-excluir-form').style.display = 'none';
+        }
+
+        document.getElementById('btn-limpar').addEventListener('click', limparFormulario);
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
