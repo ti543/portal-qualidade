@@ -308,7 +308,7 @@
     function persistirLarguraUnidade(valor) {
       if (modoAjusteGlobal && window.__souQualidade) {
         dbEstrutura._unitColWidth = String(valor);
-        localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
+        salvarDbEstruturaImediato();
       } else {
         larguraLocal.unidade = valor;
         salvarAjustesLocais();
@@ -318,7 +318,7 @@
     function persistirLarguraMensal(valor) {
       if (modoAjusteGlobal && window.__souQualidade) {
         dbEstrutura._colWidth = String(valor);
-        localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
+        salvarDbEstruturaImediato();
       } else {
         larguraLocal.mensal = valor;
         salvarAjustesLocais();
@@ -330,7 +330,7 @@
         if (!dbEstrutura._rowHeights) dbEstrutura._rowHeights = {};
         if (!dbEstrutura._rowHeights[abaAtiva]) dbEstrutura._rowHeights[abaAtiva] = {};
         dbEstrutura._rowHeights[abaAtiva][idxLinha] = valor;
-        localStorage.setItem('rg06_db_v6', JSON.stringify(dbEstrutura));
+        salvarDbEstruturaImediato();
       } else {
         if (!alturasLinhasLocais[abaAtiva]) alturasLinhasLocais[abaAtiva] = {};
         alturasLinhasLocais[abaAtiva][idxLinha] = valor;
@@ -367,15 +367,15 @@
       if (!estadoArraste) return;
       const p = posXY(e);
       if (estadoArraste.tipo === 'unit') {
-        const novo = Math.max(120, Math.min(400, Math.round(estadoArraste.largInicial + (p.x - estadoArraste.startX))));
+        const novo = Math.max(120, Math.min(600, Math.round(estadoArraste.largInicial + (p.x - estadoArraste.startX))));
         document.documentElement.style.setProperty('--unit-col-width', novo + 'px');
         estadoArraste.valorAtual = novo;
       } else if (estadoArraste.tipo === 'mensal') {
-        const novo = Math.max(50, Math.min(400, Math.round(estadoArraste.largInicial + (p.x - estadoArraste.startX))));
+        const novo = Math.max(50, Math.min(900, Math.round(estadoArraste.largInicial + (p.x - estadoArraste.startX))));
         document.documentElement.style.setProperty('--col-width', novo + 'px');
         estadoArraste.valorAtual = novo;
       } else if (estadoArraste.tipo === 'linha') {
-        const novo = Math.max(24, Math.min(200, Math.round(estadoArraste.alturaInicial + (p.y - estadoArraste.startY))));
+        const novo = Math.max(24, Math.min(400, Math.round(estadoArraste.alturaInicial + (p.y - estadoArraste.startY))));
         const linhasTbody = document.querySelectorAll('.excel-table tbody tr');
         if (linhasTbody[estadoArraste.idxLinha]) linhasTbody[estadoArraste.idxLinha].style.height = novo + 'px';
         estadoArraste.valorAtual = novo;
@@ -418,6 +418,18 @@
       _origSetItem(key, value);
       if (key === 'rg06_db_v6') agendarSalvamentoFirestore();
     };
+
+    // Grava NA HORA, sem esperar o debounce de 400ms — usado só pelo
+    // arraste de largura/altura, que já dispara uma vez só (ao soltar o
+    // mouse), nunca a cada pixel. Sem isso, se a pessoa arrastasse e saísse
+    // da página rapidinho (ex: clicou em outro módulo) antes dos 400ms, o
+    // ajuste podia nunca chegar a ser salvo de verdade no Firebase.
+    function salvarDbEstruturaImediato() {
+      _origSetItem('rg06_db_v6', JSON.stringify(dbEstrutura));
+      if (!firestoreDocRef) return;
+      clearTimeout(timeoutSalvarFirestore);
+      window.__firestoreSetDoc(firestoreDocRef, dbEstrutura, { merge: true }).catch(err => console.error('Erro ao salvar indicadores no Firebase:', err));
+    }
 
     function inicializarBanco() {
       // IMPORTANTE: `linhas` é sempre um array de OBJETOS {nome, dados} - nunca
