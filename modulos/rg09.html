@@ -207,7 +207,7 @@
         }).catch(err => console.error('Falha ao montar layout:', err));
 
         function definirDataDeHoje() {
-            document.getElementById('dataRevisao').value = new Date().toISOString().split('T')[0];
+            document.getElementById('dataRevisao').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
         }
 
         // Monta as 6 caixinhas (uma por unidade) com os dois checkboxes

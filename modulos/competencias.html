@@ -278,9 +278,17 @@
       localStorage.setItem('rg22_db_v1', JSON.stringify(db));
       clearTimeout(_salvarDBTimeout);
       _salvarDBTimeout = setTimeout(() => {
+        _salvarDBTimeout = null;
         if (window.salvarNoFirebase) window.salvarNoFirebase(db);
       }, 600);
     }
+    // Grava imediatamente se houver uma gravação agendada (usado ao fechar a aba).
+    window.__flushSalvarDB = function () {
+      if (!_salvarDBTimeout) return;
+      clearTimeout(_salvarDBTimeout);
+      _salvarDBTimeout = null;
+      if (window.salvarNoFirebase) window.salvarNoFirebase(db);
+    };
 
     let abaAtiva = 'dashboard';
     let fichaFuncAtivo = null;
@@ -348,7 +356,7 @@
     /* =========================================================
        UTILITÁRIOS DE DATA / STATUS (equivalentes às fórmulas do Excel)
        ========================================================= */
-    function hojeStr() { return new Date().toISOString().slice(0,10); }
+    function hojeStr() { return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
     // Aceita só "AAAA-MM-DD" válido — protege contra valores que vieram da planilha
     // sem ser data de verdade (ex.: célula com o texto "Instrutor" em vez de uma data).
     function dataValida(s) {
@@ -359,7 +367,8 @@
       if (!dataValida(dataStr)) return '';
       const d = new Date(dataStr + 'T00:00:00');
       d.setDate(d.getDate() + dias);
-      return d.toISOString().slice(0,10);
+      // data local (toISOString é UTC e podia pular um dia)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
     function fmtBR(dataStr) {
       if (!dataValida(dataStr)) return '-';
@@ -1257,8 +1266,34 @@
         // "db" em memória não tem um campo novo que só passou a existir depois
         // (ex: adicionado por uma atualização do sistema), gravando por cima
         // sem apagar esse campo que não conhece.
-        setDoc(dbDocRef, dbObj, { merge: true }).catch(err => console.error('Erro ao salvar no Firebase:', err));
+        // O RG22 inteiro fica num documento só, e o Firestore aceita no
+        // máximo 1 MB por documento. Avisa antes de chegar no limite e,
+        // se a gravação falhar, avisa na tela (antes só ia pro console e
+        // parecia que tinha salvo).
+        let tamanho = 0;
+        try { tamanho = new Blob([JSON.stringify(dbObj)]).size; } catch (e) { /* ignora */ }
+        if (tamanho > 850000 && !window.__avisouTamanhoRG22) {
+          window.__avisouTamanhoRG22 = true;
+          alert(`Atenção: os dados do RG22 já estão com ${(tamanho / 1048576).toFixed(2)} MB, perto do limite de 1 MB do Firebase. Avise o TI para dividir os dados antes que as gravações comecem a falhar.`);
+        }
+        return setDoc(dbDocRef, dbObj, { merge: true }).then(() => {
+          window.__erroGravacaoRG22 = false;
+        }).catch(err => {
+          console.error('Erro ao salvar no Firebase:', err);
+          if (!window.__erroGravacaoRG22) {
+            window.__erroGravacaoRG22 = true;
+            alert('NÃO foi possível salvar no servidor a última alteração do RG22.\nMotivo: ' + (err && err.message ? err.message : err) +
+              (tamanho > 1000000 ? '\n\nOs dados passaram do limite de 1 MB do Firebase — avise o TI.' : '\n\nVerifique a internet; a alteração será reenviada na próxima edição.'));
+          }
+        });
       };
+
+      // Se a aba for fechada logo depois de uma edição (antes dos 600 ms do
+      // agrupamento de gravações), envia na hora em vez de perder a alteração.
+      window.addEventListener('pagehide', () => { if (window.__flushSalvarDB) window.__flushSalvarDB(); });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && window.__flushSalvarDB) window.__flushSalvarDB();
+      });
 
       if (firestoreUnsub) firestoreUnsub();
       firestoreUnsub = onSnapshot(dbDocRef, (snap) => {

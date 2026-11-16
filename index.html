@@ -168,9 +168,33 @@
 
   const UNIDADES_PADRAO = ['CMP', 'RSL', 'GRU', 'POA', 'CTB', 'ITJ', 'MTZ'];
 
+  // Lista = unidades padrão + todas as que já existem nos perfis cadastrados
+  // + a do próprio usuário. Antes, se a unidade da pessoa não estava nas 7
+  // fixas, a caixa mostrava "CMP" e o Salvar trocava a unidade dela sem aviso.
+  let unidadesConhecidas = [...UNIDADES_PADRAO];
+
   function opcoesUnidade(selecionada) {
-    return UNIDADES_PADRAO.map(u => `<option value="${u}" ${u === selecionada ? 'selected' : ''}>${u}</option>`).join('');
+    const lista = [...new Set([...unidadesConhecidas, ...(selecionada ? [selecionada] : [])])].sort();
+    const vazio = selecionada ? '' : '<option value="" selected>Selecione...</option>';
+    return vazio + lista.map(u => `<option value="${escapeHtml(u)}" ${u === selecionada ? 'selected' : ''}>${escapeHtml(u)}</option>`).join('')
+      + '<option value="__outra__">Outra (digitar)...</option>';
   }
+
+  // "Outra (digitar)..." pede a sigla e já adiciona na caixa escolhida.
+  document.addEventListener('change', (e) => {
+    const sel = e.target;
+    if (!(sel instanceof HTMLSelectElement) || sel.value !== '__outra__') return;
+    const nova = (prompt('Sigla da unidade (ex.: BQE, CRI, SCO):') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!nova) { sel.value = sel.dataset.anterior || ''; return; }
+    if (!unidadesConhecidas.includes(nova)) unidadesConhecidas.push(nova);
+    const opt = document.createElement('option');
+    opt.value = nova; opt.textContent = nova;
+    sel.insertBefore(opt, sel.querySelector('option[value="__outra__"]'));
+    sel.value = nova;
+  });
+  document.addEventListener('focusin', (e) => {
+    if (e.target instanceof HTMLSelectElement) e.target.dataset.anterior = e.target.value;
+  });
 
   document.getElementById('novo-uid-unidade').innerHTML = opcoesUnidade();
 
@@ -196,7 +220,7 @@
 
   async function fazerLogin() {
     const email = document.getElementById('login-email').value.trim();
-    const senha = document.getElementById('login-senha').value.trim();
+    const senha = document.getElementById('login-senha').value; // senha não leva trim: espaço pode fazer parte dela
     const erroDiv = document.getElementById('login-erro');
     erroDiv.style.display = 'none';
 
@@ -212,7 +236,12 @@
     try {
       await signInWithEmailAndPassword(auth, email, senha);
     } catch (err) {
-      erroDiv.textContent = 'E-mail ou senha incorretos.';
+      const cod = (err && err.code) || '';
+      erroDiv.textContent =
+        cod === 'auth/too-many-requests' ? 'Muitas tentativas. Aguarde alguns minutos e tente de novo.'
+        : cod === 'auth/network-request-failed' ? 'Sem conexão com a internet. Verifique a rede e tente de novo.'
+        : cod === 'auth/user-disabled' ? 'Este usuário está desativado. Contate a qualidade.'
+        : 'E-mail ou senha incorretos.';
       erroDiv.style.display = 'block';
     }
     btn.disabled = false;
@@ -346,7 +375,7 @@
       ? modulosCache.map(m => m.slug)
       : Array.from(document.querySelectorAll('#chk-modulos-novo input[type=checkbox]:checked')).map(c => c.value);
 
-    if (!uid || !unidade) { alert('Preencha ao menos o UID e a unidade.'); return; }
+    if (!uid || !unidade || unidade === '__OUTRA__') { alert('Preencha ao menos o UID e a unidade.'); return; }
 
     try {
       await setDoc(doc(db, 'usuarios_perfil', uid), {
@@ -412,6 +441,8 @@
   async function renderizarTabelaUsuarios() {
     const snap = await getDocs(collection(db, 'usuarios_perfil'));
     const usuarios = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    usuarios.forEach(u => { if (u.unidade && u.unidade !== '---' && !unidadesConhecidas.includes(u.unidade)) unidadesConhecidas.push(u.unidade); });
+    document.getElementById('novo-uid-unidade').innerHTML = opcoesUnidade();
     const tbody = document.getElementById('tabela-usuarios');
 
     // Pra Master, mostra todos os módulos já marcados (e travados) mesmo que
@@ -468,8 +499,13 @@
         const modulosMarcados = papel === 'qualidade'
           ? modulosCache.map(m => m.slug)
           : Array.from(tr.querySelectorAll('.campo-modulo:checked')).map(c => c.value);
-        await updateDoc(doc(db, 'usuarios_perfil', uid), { unidade, papel, modulosPermitidos: modulosMarcados });
-        alert('Salvo!');
+        if (!unidade || unidade === '__OUTRA__') { alert('Escolha a unidade antes de salvar.'); return; }
+        try {
+          await updateDoc(doc(db, 'usuarios_perfil', uid), { unidade, papel, modulosPermitidos: modulosMarcados });
+          alert('Salvo!');
+        } catch (err) {
+          alert('Erro ao salvar: ' + err.message);
+        }
       });
     });
 

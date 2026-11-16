@@ -398,7 +398,7 @@
 <script type="module">
   import { auth, db } from '../firebase-config.js';
   import {
-    doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, runTransaction
+    doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, runTransaction, query, where
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { initLayout, escapeHtml } from '../assets/layout.js';
 
@@ -592,7 +592,11 @@
   // OCORRÊNCIAS
   // ---------------------------------------------------------------------
   async function carregarOcorrencias() {
-    const snap = await getDocs(collection(db, 'rg29_ocorrencias'));
+    // Quem não é MTZ/qualidade só pode ler as da própria unidade — e o
+    // Firestore recusa a consulta INTEIRA se ela não tiver esse filtro
+    // (as regras não filtram sozinhas). Sem isso a lista da filial vinha vazia.
+    const ref = collection(db, 'rg29_ocorrencias');
+    const snap = await getDocs(vejoTudo() ? ref : query(ref, where('unidadeRegistrou', '==', perfil.unidade)));
     dadosOcorrenciasGlobais = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.numeroSequencial || 0) - (a.numeroSequencial || 0));
@@ -607,6 +611,13 @@
       if ((item.numeroSequencial || 0) > maior) maior = item.numeroSequencial;
     });
     document.getElementById('numero').value = String(maior + 1).padStart(4, '0');
+    // A filial só enxerga as próprias ocorrências, então o "maior" acima pode
+    // estar atrasado — o número real vem do contador (o mesmo que a gravação usa).
+    getDoc(doc(db, 'contadores', MODULO)).then(snap => {
+      if (editandoIdGlobal || !snap.exists()) return;
+      const prox = (snap.data().ultimoNumero || 0) + 1;
+      document.getElementById('numero').value = String(Math.max(prox, maior + 1)).padStart(4, '0');
+    }).catch(() => {});
   }
 
   async function salvarOcorrencia() {
@@ -792,7 +803,7 @@
     const planilha = XLSX.utils.json_to_sheet(linhas);
     const livro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(livro, planilha, 'Ocorrências RG29');
-    XLSX.writeFile(livro, `RG29_ocorrencias_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(livro, `RG29_ocorrencias_${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}.xlsx`);
   }
 
   function renderizarTabelaOcorrencias(dados) {

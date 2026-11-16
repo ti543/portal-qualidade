@@ -64,13 +64,20 @@ service cloud.firestore {
       // se o e-mail (verificado pelo próprio Firebase Auth) começar com
       // qualidade@ ou matriz@ — o resto sempre nasce como "filial".
       // Qualidade pode criar/editar perfil de qualquer um, com qualquer valor.
+      // Segurança: o Master automático só vale pra e-mail do domínio da
+      // empresa E verificado — antes aceitava qualidade@ de QUALQUER domínio
+      // (ex.: qualidade@gmail.com criado por alguém de fora virava Master).
+      // A unidade do autocadastro também precisa ser o prefixo do e-mail
+      // (igual o site já faz), pra ninguém se cadastrar como "MTZ".
       allow create: if logado() && (
         (request.auth.uid == uid
           && request.resource.data.modulosPermitidos.size() == 0
+          && request.resource.data.unidade == request.auth.token.email.split("@")[0].upper()
           && (
             request.resource.data.papel == "filial"
             || (request.resource.data.papel == "qualidade"
-                && request.auth.token.email.matches("(?i)^(qualidade|matriz)@.*"))
+                && request.auth.token.email_verified == true
+                && request.auth.token.email.lower().matches("^(qualidade|matriz)@mirindosul[.]com[.]br$"))
           )
         )
         || souQualidade()
@@ -102,8 +109,18 @@ service cloud.firestore {
     // ------------------------------------------------------------------
     // CONTADOR DE NÚMERO SEQUENCIAL POR MÓDULO
     // ------------------------------------------------------------------
+    // Só aceita criar o contador (1ª vez) ou somar exatamente +1 — antes
+    // qualquer usuário com o módulo podia zerar/voltar o número e gerar
+    // registros com número repetido.
     match /contadores/{slug} {
-      allow read, write: if temPermissao(slug);
+      allow read: if temPermissao(slug);
+      allow create: if temPermissao(slug)
+        && request.resource.data.keys().hasOnly(["ultimoNumero"])
+        && request.resource.data.ultimoNumero is int;
+      allow update: if temPermissao(slug)
+        && request.resource.data.keys().hasOnly(["ultimoNumero"])
+        && request.resource.data.ultimoNumero == resource.data.ultimoNumero + 1;
+      allow delete: if souQualidade();
     }
 
     // ------------------------------------------------------------------

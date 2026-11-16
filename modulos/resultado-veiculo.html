@@ -1276,6 +1276,22 @@ async function salvarImportacao() {
     // empurrar o documento pra perto do limite de 1MB do Firestore — aí a
     // gravação inteira falha (depois de já ter revisado e digitado os
     // valores manuais da semana toda) sem nenhum aviso prévio de tamanho.
+    // Não deixa lançar duas vezes a mesma semana da mesma unidade (a filial
+    // não consegue excluir a duplicada depois — só a qualidade).
+    const jaLancadas = await getDocs(query(collection(db, 'rv_importacoes'), where('unidade', '==', calculoAtual.unidade)));
+    const duplicada = jaLancadas.docs.find(d => {
+      const x = d.data();
+      return x.periodoInicio === calculoAtual.periodoInicio && x.periodoFim === calculoAtual.periodoFim;
+    });
+    if (duplicada) {
+      const periodoBr = `${calculoAtual.periodoInicio.split('-').reverse().join('/')} a ${calculoAtual.periodoFim.split('-').reverse().join('/')}`;
+      if (!souQualidade()) {
+        alert(`A semana ${periodoBr} da ${calculoAtual.unidade} já foi lançada. Se precisar corrigir, peça para a qualidade editar ou excluir a que já existe.`);
+        return;
+      }
+      if (!confirm(`A semana ${periodoBr} da ${calculoAtual.unidade} JÁ foi lançada. Quer lançar de novo mesmo assim (vai ficar duplicada)?`)) return;
+    }
+
     await addDoc(collection(db, 'rv_importacoes'), {
       unidade: calculoAtual.unidade,
       periodoInicio: calculoAtual.periodoInicio,
@@ -1313,7 +1329,14 @@ async function carregarImportacoesDaUnidade() {
   if (!unidade) { selImp.innerHTML = '<option value="">Selecione a unidade...</option>'; return; }
 
   selImp.innerHTML = '<option value="">Carregando...</option>';
-  const snap = await getDocs(query(collection(db, 'rv_importacoes'), where('unidade', '==', unidade)));
+  let snap;
+  try {
+    snap = await getDocs(query(collection(db, 'rv_importacoes'), where('unidade', '==', unidade)));
+  } catch (err) {
+    console.error('Erro ao carregar semanas:', err);
+    selImp.innerHTML = '<option value="">Erro ao carregar — tente de novo</option>';
+    return;
+  }
   importacoesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.periodoInicio || '').localeCompare(a.periodoInicio || ''));
 
@@ -1898,7 +1921,7 @@ function exportarComparacaoPlacas() {
   XLSX.utils.book_append_sheet(livro, XLSX.utils.json_to_sheet(c.entraram.map(r => ({ Placa: r.placa, Tipo: r.tipo, Relacionamento: r.relacionamento }))), 'Novas');
   XLSX.utils.book_append_sheet(livro, XLSX.utils.json_to_sheet(c.saidas.map(r => ({ Placa: r.placa, Tipo: r.tipo, Relacionamento: r.relacionamento }))), 'Sairam');
   XLSX.utils.book_append_sheet(livro, XLSX.utils.json_to_sheet(c.mudaram.map(r => ({ Placa: r.placa, 'Tipo antes': r.tipoAntes, 'Tipo agora': r.tipoDepois, 'Relac antes': r.relacAntes, 'Relac agora': r.relacDepois }))), 'Mudaram');
-  XLSX.writeFile(livro, `Comparacao_placas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(livro, `Comparacao_placas_${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}.xlsx`);
 }
 
 /* =====================================================================

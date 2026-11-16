@@ -357,7 +357,7 @@
         }).catch(err => console.error('Falha ao montar layout:', err));
 
         function definirDataDeHoje() {
-            document.getElementById('data_abertura').value = new Date().toISOString().split('T')[0];
+            document.getElementById('data_abertura').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
         }
 
         function configurarAlternanciaDeAbas() {

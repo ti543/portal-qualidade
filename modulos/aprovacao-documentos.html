@@ -236,7 +236,7 @@
         }).catch(err => console.error('Falha ao montar layout:', err));
 
         function definirDataDeHoje() {
-            document.getElementById('data_elaboracao').value = new Date().toISOString().split('T')[0];
+            document.getElementById('data_elaboracao').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
         }
 
         // Gera o número sequencial e grava o registro na MESMA transação sobre
@@ -352,7 +352,7 @@
                     status_documento: "Aprovado",
                     aprovacao: {
                         aprovado_por: nome,
-                        data_aprovacao: new Date().toISOString().split('T')[0],
+                        data_aprovacao: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
                         parecer: "Documento aprovado."
                     },
                     atualizado_em: new Date().toISOString()
@@ -372,7 +372,7 @@
                     status_documento: "Reprovado",
                     aprovacao: {
                         aprovado_por: usuarioUnidade,
-                        data_aprovacao: new Date().toISOString().split('T')[0],
+                        data_aprovacao: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
                         parecer: motivo || "Documento reprovado."
                     },
                     atualizado_em: new Date().toISOString()

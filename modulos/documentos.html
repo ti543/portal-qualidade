@@ -315,7 +315,7 @@
     import { auth, db } from '../firebase-config.js';
     import {
       collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, addDoc,
-      getDocs, serverTimestamp
+      getDocs, serverTimestamp, writeBatch
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { initLayout, escapeHtml, LOGO_URL } from '../assets/layout.js';
 
@@ -452,7 +452,7 @@
     // Data de criação/revisão: editáveis à mão (igual no cabeçalho dos Word
     // que a qualidade já usa), não é mais só um timestamp automático.
     function hojeISO() {
-      return new Date().toISOString().slice(0, 10);
+      return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     }
     function fmtDataBR(iso) {
       if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '—';
@@ -826,13 +826,16 @@
           const existente = documentosCarregados.find(d => d.id === chave);
           const revisaoFinal = c.revisao ? String(c.revisao).padStart(2, '0') : '';
 
+          // obsoleta + nova revisão numa gravação só: ou grava as duas, ou nenhuma
+          const lote = writeBatch(db);
           if (existente) {
-            await addDoc(collection(docRef, 'versoes_obsoletas'), {
+            lote.set(doc(collection(docRef, 'versoes_obsoletas')), {
               revisao: existente.revisao || '',
               titulo: existente.titulo || '',
               conteudo: existente.conteudo || '',
               conteudoFormato: existente.conteudoFormato || 'texto',
-              obsoletoEm: serverTimestamp()
+              obsoletoEm: serverTimestamp(),
+              obsoletoPor: auth.currentUser?.email || ''
             });
           }
 
@@ -851,10 +854,13 @@
             revisao: revisaoFinal,
             dataRevisao: hojeISO(),
             atualizadoEm: serverTimestamp(),
-            atualizadoPor: (perfilAtual && perfilAtual.unidade) || ''
+            atualizadoPor: auth.currentUser?.email || (perfilAtual && perfilAtual.unidade) || '',
+            atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
           };
           if (!existente) payload.dataCriacao = hojeISO();
-          await setDoc(docRef, payload, { merge: true });
+          if (new Blob([c.conteudo || '']).size > 950000) throw new Error('conteúdo maior que o limite de 1 MB do Firebase');
+          lote.set(docRef, payload, { merge: true });
+          await lote.commit();
 
           ok++;
         } catch (err) {
@@ -1343,28 +1349,41 @@
       btnSalvar.disabled = true;
       btnSalvar.textContent = 'Salvando...';
 
+      // Versão obsoleta + nova revisão vão numa gravação só (lote): ou grava
+      // as duas, ou nenhuma. Antes eram separadas e, se a segunda falhasse
+      // (ex.: documento grande demais), ficava uma versão obsoleta falsa.
+      const lote = writeBatch(db);
+      const tamanhoConteudo = new Blob([conteudo]).size;
+      if (tamanhoConteudo > 950000) {
+        alert(`O conteúdo está com ${(tamanhoConteudo / 1048576).toFixed(2)} MB e passa do limite do Firebase (1 MB por documento). Diminua as imagens e tente de novo.`);
+        btnSalvar.disabled = false;
+        btnSalvar.textContent = 'Salvar';
+        return;
+      }
       try {
         if (idExistente) {
           const atual = documentosCarregados.find(x => x.id === idExistente);
           const docRef = doc(db, 'biblioteca_documentos', idExistente);
 
           if (atual && atual.conteudo !== undefined) {
-            await addDoc(collection(docRef, 'versoes_obsoletas'), {
+            lote.set(doc(collection(docRef, 'versoes_obsoletas')), {
               revisao: atual.revisao || '',
               titulo: atual.titulo || '',
               conteudo: atual.conteudo || '',
               conteudoFormato: atual.conteudoFormato || 'texto',
-              obsoletoEm: serverTimestamp()
+              obsoletoEm: serverTimestamp(),
+              obsoletoPor: auth.currentUser?.email || ''
             });
           }
 
-          await updateDoc(docRef, {
+          lote.update(docRef, {
             categoria, codigo, titulo, conteudo,
             dataCriacao, dataRevisao,
             conteudoFormato: 'html',
             revisao: proximaRevisao(atual ? atual.revisao : '0'),
             atualizadoEm: serverTimestamp(),
-            atualizadoPor: (perfilAtual && perfilAtual.unidade) || ''
+            atualizadoPor: auth.currentUser?.email || (perfilAtual && perfilAtual.unidade) || '',
+            atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
           });
         } else {
           const novoId = `${slugificar(categoria)}--${slugificar(codigo)}`;
@@ -1377,37 +1396,41 @@
               btnSalvar.textContent = 'Salvar';
               return;
             }
-            await addDoc(collection(docRef, 'versoes_obsoletas'), {
+            lote.set(doc(collection(docRef, 'versoes_obsoletas')), {
               revisao: existente.revisao || '',
               titulo: existente.titulo || '',
               conteudo: existente.conteudo || '',
               conteudoFormato: existente.conteudoFormato || 'texto',
-              obsoletoEm: serverTimestamp()
+              obsoletoEm: serverTimestamp(),
+              obsoletoPor: auth.currentUser?.email || ''
             });
-            await updateDoc(docRef, {
+            lote.update(docRef, {
               categoria, codigo, titulo, conteudo,
               dataCriacao, dataRevisao,
               conteudoFormato: 'html',
               revisao: proximaRevisao(existente.revisao),
               atualizadoEm: serverTimestamp(),
-              atualizadoPor: (perfilAtual && perfilAtual.unidade) || ''
+              atualizadoPor: auth.currentUser?.email || (perfilAtual && perfilAtual.unidade) || '',
+            atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
             });
           } else {
-            await setDoc(docRef, {
+            lote.set(docRef, {
               categoria, codigo, titulo, conteudo,
               dataCriacao, dataRevisao,
               conteudoFormato: 'html',
               revisao: '01',
               atualizadoEm: serverTimestamp(),
-              atualizadoPor: (perfilAtual && perfilAtual.unidade) || ''
+              atualizadoPor: auth.currentUser?.email || (perfilAtual && perfilAtual.unidade) || '',
+            atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
             });
           }
         }
 
+        await lote.commit();
         fecharDrawer();
       } catch (err) {
         console.error('Erro ao salvar documento:', err);
-        alert('Não foi possível salvar o documento agora.');
+        alert('Não foi possível salvar o documento agora.\nMotivo: ' + (err && err.message ? err.message : err));
         btnSalvar.disabled = false;
         btnSalvar.textContent = 'Salvar';
       }
