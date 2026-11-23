@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="../assets/layout.css" rel="stylesheet">
+  <link href="../assets/layout.css?v=5" rel="stylesheet">
   <!-- Gera o PDF do registro de treinamento (RG 24) inteiramente no navegador —
        mesma técnica já usada na Biblioteca de Documentos: html2canvas "fotografa"
        o bloco formatado e o jsPDF monta as páginas a partir disso. -->
@@ -1240,7 +1240,7 @@
   <script type="module">
     import { auth, db as firestoreDb } from '../firebase-config.js';
     import { doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { initLayout } from '../assets/layout.js';
+    import { initLayout } from '../assets/layout.js?v=5';
 
     const dbDocRef = doc(firestoreDb, "rg22_competencias", "dados");
 

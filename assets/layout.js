@@ -71,8 +71,8 @@ export function garantirEsqueleto({ homeHref }) {
           </div>
         </aside>
         <main class="qc-main">
-          <button type="button" class="qc-sidebar-colapsar" id="qc-sidebar-colapsar" title="Recolher menu">
-            <i class="bi bi-chevron-left"></i> <span>Recolher menu</span>
+          <button type="button" class="qc-sidebar-colapsar" id="qc-sidebar-colapsar" title="Recolher menu" aria-label="Recolher menu">
+            <i class="bi bi-chevron-left"></i>
           </button>
           <div class="qc-topbar" id="qc-topbar"></div>
           ${conteudoHtml}
@@ -167,10 +167,9 @@ function ligarBotaoColapsarSidebar() {
 function atualizarIconeColapsar(btn) {
   const estaRecolhida = document.body.classList.contains('qc-sidebar-recolhida');
   const icone = btn.querySelector('i');
-  const texto = btn.querySelector('span');
   if (icone) icone.className = estaRecolhida ? 'bi bi-chevron-right' : 'bi bi-chevron-left';
-  if (texto) texto.textContent = estaRecolhida ? 'Mostrar menu' : 'Recolher menu';
   btn.title = estaRecolhida ? 'Mostrar menu' : 'Recolher menu';
+  btn.setAttribute('aria-label', btn.title);
 }
 
 function montarSidebarNav(modulos, activeSlug, souQualidade, homeHref) {
@@ -186,8 +185,12 @@ function montarSidebarNav(modulos, activeSlug, souQualidade, homeHref) {
   const baseModulos = dentroDeModulo ? '' : 'modulos/';
 
   let html = `
-    <a class="qc-sidebar-link ${!activeSlug ? 'active' : ''}" href="${homeHref}">
+    <a class="qc-sidebar-link ${!activeSlug ? 'active' : ''}" data-key="__inicio__" href="${homeHref}">
       <i class="bi bi-house-door-fill"></i> Início
+    </a>
+    <a class="qc-sidebar-link ${activeSlug === '__pendencias__' ? 'active' : ''}" data-key="__pendencias__" href="${homeHref}#pendencias">
+      <i class="bi bi-exclamation-triangle-fill qc-ico-alerta"></i> Pendências
+      <span class="qc-sidebar-selo" id="qc-selo-pendencias"></span>
     </a>
     <div class="qc-sidebar-section-label">Módulos</div>
   `;
@@ -201,13 +204,37 @@ function montarSidebarNav(modulos, activeSlug, souQualidade, homeHref) {
   if (souQualidade) {
     html += `
       <div class="qc-sidebar-section-label">Administração</div>
-      <a class="qc-sidebar-link ${activeSlug === '__admin__' ? 'active' : ''}" href="${homeHref}#admin">
+      <a class="qc-sidebar-link ${activeSlug === '__admin__' ? 'active' : ''}" data-key="__admin__" href="${homeHref}#admin">
         <i class="bi bi-gear-fill"></i> Painel Admin
       </a>
     `;
   }
 
   nav.innerHTML = html;
+  atualizarSeloPendencias();
+}
+
+/**
+ * Selo com o número de pendências no item "Pendências" do menu.
+ * A tela inicial calcula e guarda aqui (localStorage); os módulos só mostram o último valor.
+ */
+export function atualizarSeloPendencias(dados) {
+  try {
+    if (dados) localStorage.setItem('qc-pendencias', JSON.stringify({ ...dados, em: Date.now() }));
+    else dados = JSON.parse(localStorage.getItem('qc-pendencias') || 'null');
+  } catch (e) { /* ignora */ }
+  const selo = document.getElementById('qc-selo-pendencias');
+  if (!selo) return;
+  const total = dados && dados.total ? dados.total : 0;
+  selo.textContent = total > 99 ? '99+' : (total || '');
+  selo.className = 'qc-sidebar-selo' + (total ? (dados.critico ? ' critico' : ' atencao') : '');
+}
+
+/** Marca qual item do menu está ativo (usado pela tela inicial ao trocar de aba). */
+export function marcarSidebarAtivo(chave) {
+  document.querySelectorAll('#qc-sidebar-nav .qc-sidebar-link[data-key]').forEach(a => {
+    a.classList.toggle('active', a.dataset.key === chave);
+  });
 }
 
 function montarTopbar({ pageTitle, breadcrumb, isoDocId }) {

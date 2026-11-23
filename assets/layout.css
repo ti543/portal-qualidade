@@ -139,27 +139,35 @@ body.qc-body {
    visível e no mesmo lugar relativo à sidebar, acompanhando o "left" dela
    com a mesma transição suave de .qc-main — desliza junto quando
    recolhe/expande, sem depender de recalcular posição dentro do conteúdo. */
+/* Setinha discreta presa na borda da sidebar (aba). Fica no meio da altura,
+   na faixa de margem do conteudo - nao cobre titulo nem informacao. Recolhida,
+   a mesma aba fica na borda esquerda da tela para trazer o menu de volta. */
 .qc-sidebar-colapsar {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   position: fixed;
-  top: 14px;
-  left: calc(var(--qc-sidebar-width) + 14px);
+  top: 50%;
+  left: var(--qc-sidebar-width);
+  transform: translateY(-50%);
   z-index: 55;
-  padding: 7px 14px;
-  border-radius: 20px;
-  background: #fff;
-  border: 1px solid #ddd;
-  color: #555;
-  font-size: 12px;
-  font-weight: 600;
+  width: 16px;
+  height: 46px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  background: var(--qc-primary);
+  color: rgba(255,255,255,.75);
+  font-size: 11px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  transition: background .2s, color .2s, border-color .2s, left .25s ease;
+  opacity: .55;
+  box-shadow: 2px 0 6px rgba(0,0,0,.12);
+  transition: opacity .2s, width .15s, color .2s, left .25s ease;
 }
-body.qc-sidebar-recolhida .qc-sidebar-colapsar { left: 14px; }
-.qc-sidebar-colapsar:hover { background: var(--qc-primary); color: #fff; border-color: var(--qc-primary); }
+.qc-sidebar-colapsar span { display: none; }
+.qc-sidebar-colapsar .bi { line-height: 1; }
+body.qc-sidebar-recolhida .qc-sidebar-colapsar { left: 0; }
+.qc-sidebar-colapsar:hover, .qc-sidebar-colapsar:focus-visible { opacity: 1; width: 20px; color: #fff; outline: none; }
 
 body.qc-sidebar-recolhida .qc-sidebar { transform: translateX(-100%); }
 body.qc-sidebar-recolhida .qc-main { margin-left: 0; }
@@ -339,3 +347,20 @@ body.qc-sidebar-recolhida .qc-main { margin-left: 0; }
 .qc-modulo-selo.critico { background:#c0392b; }
 @media (max-width: 600px) { .qc-alertas-grid { grid-template-columns:1fr; } }
 .qc-modulo-card:has(.qc-modulo-selo) h3 { padding-right: 30px; }
+
+/* ===================== PENDÊNCIAS: menu, aba e resumo ===================== */
+.qc-sidebar-link .qc-ico-alerta { color: #ffc940; }
+.qc-sidebar-selo { margin-left: auto; min-width: 20px; height: 20px; border-radius: 10px; padding: 0 6px; font-size: 11px; font-weight: 700; display: none; align-items: center; justify-content: center; color: #fff; }
+.qc-sidebar-selo.atencao { display: inline-flex; background: #e0a800; }
+.qc-sidebar-selo.critico { display: inline-flex; background: #d92323; }
+.qc-home-tab-btn .qc-ico-alerta { color: #e0a800; }
+.qc-home-tab-btn.active .qc-ico-alerta { color: #ffc940; }
+.qc-tab-selo { display: none; margin-left: 6px; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px; font-size: 11px; font-weight: 700; color: #fff; align-items: center; justify-content: center; vertical-align: 1px; }
+.qc-tab-selo.atencao { display: inline-flex; background: #e0a800; }
+.qc-tab-selo.critico { display: inline-flex; background: #d92323; }
+.qc-resumo-pend { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-size: 13px; color: #333; background: #fff4d6; border-left: 5px solid #e0a800; }
+.qc-resumo-pend.critico { background: #fdeaea; border-left-color: #c0392b; }
+.qc-resumo-pend > i { font-size: 18px; color: #e0a800; }
+.qc-resumo-pend.critico > i { color: #c0392b; }
+.qc-resumo-ir { margin-left: auto; font-weight: 700; color: var(--qc-primary); white-space: nowrap; }
+.qc-resumo-pend:hover { filter: brightness(.98); }
