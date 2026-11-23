@@ -70,6 +70,7 @@
   </div>
 
   <div class="qc-home-section active" id="secao-modulos">
+    <div id="painel-alertas" class="qc-alertas"><div class="qc-alertas-carregando"><i class="bi bi-hourglass-split"></i> Verificando pendências dos seus módulos...</div></div>
     <div id="lista-modulos" class="qc-modulos-grid"></div>
   </div>
 
@@ -152,6 +153,7 @@
   import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { exibirShell, garantirEsqueleto, escapeHtml } from './assets/layout.js';
+  import { carregarAlertas, renderizarPainelAlertas, contagemPorModulo } from './assets/alertas.js';
 
   garantirEsqueleto({ homeHref: './index.html' });
 
@@ -268,6 +270,7 @@
 
       document.getElementById('aba-admin-btn').style.display = souQualidade() ? 'inline-block' : 'none';
       renderizarListaModulos();
+      atualizarAlertas();
       if (window.location.hash === '#admin' && souQualidade()) ativarAba('admin');
     } else {
       document.getElementById('qc-loading').style.display = 'none';
@@ -327,6 +330,24 @@
     modulosCache = snap.docs.map(d => ({ slug: d.id, ...d.data() }));
   }
 
+  // -------------------------------------------------------------------
+  // PAINEL DE ALERTAS (pendências dos módulos liberados para quem logou)
+  // -------------------------------------------------------------------
+  let contagemAlertas = {};
+  async function atualizarAlertas() {
+    const alvo = document.getElementById('painel-alertas');
+    try {
+      const grupos = await carregarAlertas({ db, perfil: perfilAtual, modulos: modulosCache });
+      if (!perfilAtual) return;                       // saiu enquanto carregava
+      renderizarPainelAlertas(alvo, grupos);
+      contagemAlertas = contagemPorModulo(grupos);
+      renderizarListaModulos();
+    } catch (e) {
+      console.warn('Painel de alertas:', e);
+      alvo.innerHTML = '';
+    }
+  }
+
   function renderizarListaModulos() {
     const permitidos = modulosCache.filter(m => souQualidade() || (perfilAtual.modulosPermitidos || []).includes(m.slug));
     const container = document.getElementById('lista-modulos');
@@ -338,6 +359,8 @@
 
     container.innerHTML = permitidos.map(m => `
       <a class="qc-modulo-card" href="modulos/${escapeHtml(m.slug)}.html">
+        ${contagemAlertas[m.slug] && contagemAlertas[m.slug].total
+          ? `<span class="qc-modulo-selo ${contagemAlertas[m.slug].critico ? 'critico' : 'atencao'}" title="Pendências">${contagemAlertas[m.slug].total}</span>` : ''}
         <h3>${escapeHtml(m.nome)}</h3>
         <p>${escapeHtml(m.descricao || '')}</p>
         <span class="qc-ir">Acessar &rarr;</span>

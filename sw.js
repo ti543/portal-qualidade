@@ -12,13 +12,14 @@
    o cache antigo de todo mundo automaticamente.
    ========================================================================= */
 
-const CACHE_VERSION = 'cq-shell-v2';
+const CACHE_VERSION = 'cq-shell-v3';
 
 const ARQUIVOS_SHELL = [
   './index.html',
   './manifest.webmanifest',
   './assets/layout.css',
   './assets/layout.js',
+  './assets/alertas.js',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png'
 ];
