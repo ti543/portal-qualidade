@@ -45,7 +45,18 @@ function iconeDoModulo(slug) {
  * A página chamadora só precisa ter <div id="qc-page-content"></div> com o
  * conteúdo específico do módulo; o resto é montado aqui.
  */
+/** Garante a fonte de ícones (bi bi-...) usada no menu, na setinha e nos alertas,
+ *  mesmo em módulos que não incluem o link no <head>. */
+function garantirIcones() {
+  if (document.querySelector('link[href*="bootstrap-icons"]')) return;
+  const l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css';
+  document.head.appendChild(l);
+}
+
 export function garantirEsqueleto({ homeHref }) {
+  garantirIcones();
   if (document.getElementById('qc-app')) return;
 
   const pageContent = document.getElementById('qc-page-content');

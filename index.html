@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-<link href="./assets/layout.css?v=5" rel="stylesheet">
+<link href="./assets/layout.css?v=6" rel="stylesheet">
 <style>
   /* Estilos específicos desta página (login + formulários de admin).
      Tudo que é compartilhado com os módulos fica em assets/layout.css */
@@ -157,7 +157,7 @@
   import { auth, db } from './firebase-config.js';
   import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { exibirShell, garantirEsqueleto, escapeHtml, atualizarSeloPendencias, marcarSidebarAtivo } from './assets/layout.js?v=5';
+  import { exibirShell, garantirEsqueleto, escapeHtml, atualizarSeloPendencias, marcarSidebarAtivo } from './assets/layout.js?v=6';
   import { carregarAlertas, renderizarPainelAlertas, contagemPorModulo } from './assets/alertas.js?v=5';
 
   garantirEsqueleto({ homeHref: './index.html' });
