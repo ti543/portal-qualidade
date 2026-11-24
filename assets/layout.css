@@ -364,3 +364,6 @@ body.qc-sidebar-recolhida .qc-main { margin-left: 0; }
 .qc-resumo-pend.critico > i { color: #c0392b; }
 .qc-resumo-ir { margin-left: auto; font-weight: 700; color: var(--qc-primary); white-space: nowrap; }
 .qc-resumo-pend:hover { filter: brightness(.98); }
+
+/* Campos e botões usam a mesma fonte da página em todos os módulos */
+body.qc-body button, body.qc-body input, body.qc-body select, body.qc-body textarea { font-family: inherit; }

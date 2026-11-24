@@ -57,6 +57,7 @@ function garantirIcones() {
 
 export function garantirEsqueleto({ homeHref }) {
   garantirIcones();
+  document.body.classList.add('qc-body');   // mesma fonte/fundo em todos os módulos
   if (document.getElementById('qc-app')) return;
 
   const pageContent = document.getElementById('qc-page-content');
