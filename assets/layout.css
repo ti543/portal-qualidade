@@ -367,3 +367,11 @@ body.qc-sidebar-recolhida .qc-main { margin-left: 0; }
 
 /* Campos e botões usam a mesma fonte da página em todos os módulos */
 body.qc-body button, body.qc-body input, body.qc-body select, body.qc-body textarea { font-family: inherit; }
+
+/* Login: esqueci a senha */
+.qc-login-ok { color:#1e7e34; font-size:13px; margin-top:10px; display:none; line-height:1.4; }
+.qc-login-esqueci { display:inline-block; margin-top:14px; font-size:13px; color:var(--qc-primary); text-decoration:none; }
+.qc-login-esqueci:hover { text-decoration:underline; }
+/* Admin: bloco recolhido "vincular pelo UID" */
+.qc-avancado { margin:6px 0 12px; font-size:13px; }
+.qc-avancado summary { cursor:pointer; color:var(--qc-primary); font-weight:600; }
