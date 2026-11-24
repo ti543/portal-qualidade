@@ -2,7 +2,7 @@
   "name": "Portal da Qualidade - MirindoSul",
   "short_name": "Portal da Qualidade",
   "description": "Sistema de gestão da qualidade (SGQ) da MirindoSul — ações corretivas, indicadores, competências e documentos.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f5f9",

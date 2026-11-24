@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="../assets/layout.css?v=8" rel="stylesheet">
+  <link href="../assets/layout.css?v=9" rel="stylesheet">
   <!-- Lê o .docx inteiro no navegador (nada é enviado pra nenhum servidor além
        do conteúdo extraído, que vai pro Firestore igual a edição manual). -->
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
@@ -317,7 +317,7 @@
       collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, addDoc,
       getDocs, serverTimestamp, writeBatch
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { initLayout, escapeHtml, LOGO_URL } from '../assets/layout.js?v=8';
+    import { initLayout, escapeHtml, LOGO_URL } from '../assets/layout.js?v=9';
 
     const CATEGORIAS_PADRAO = ['Manual da Qualidade', 'Procedimentos Gerais', 'Instrução de Trabalho', 'Descrição de Funções'];
 
@@ -334,7 +334,7 @@
       isoDocId: 'documentos',
       isoCollection: 'modulo_config',
       isoEditLevel: 'qualidade',
-      homeHref: '../index.html'
+      homeHref: '../'
     }).then(({ perfil, souQualidade }) => {
       perfilAtual = perfil;
       podeEditar = !!souQualidade;

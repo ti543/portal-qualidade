@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="../assets/layout.css?v=8" rel="stylesheet">
+  <link href="../assets/layout.css?v=9" rel="stylesheet">
   <style>
     :root {
       --primary-color: #000080;
@@ -1240,7 +1240,7 @@
   <script type="module">
     import { auth, db } from '../firebase-config.js';
     import { doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { initLayout } from '../assets/layout.js?v=8';
+    import { initLayout } from '../assets/layout.js?v=9';
 
     const MODULO = 'indicadores';
     window.__firestoreSetDoc = setDoc;
@@ -1250,7 +1250,7 @@
       activeSlug: MODULO,
       pageTitle: 'RG 06 - Acompanhamento dos Indicadores de Monitoramento dos Processos',
       breadcrumb: 'Qualidade',
-      homeHref: '../index.html',
+      homeHref: '../',
       isoDocId: MODULO,
       isoCollection: 'modulo_config',
       isoEditLevel: 'qualidade'

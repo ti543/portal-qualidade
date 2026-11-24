@@ -385,7 +385,7 @@ export function initLayout({
   isoDocId = null,
   isoCollection = 'configuracoes',
   isoEditLevel = 'qualquer',
-  homeHref = './index.html',
+  homeHref = './',
   papelExigido = null,
 }) {
   garantirEsqueleto({ homeHref });
