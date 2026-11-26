@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veículo Desligado - MIR</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0b3d91">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", Arial, sans-serif; background:#0b3d91; color:#1d2a44; min-height:100vh; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 16px; }
+  .brand-header{background:#fff;border-radius:12px;padding:12px 22px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap;box-shadow:0 3px 14px rgba(0,0,0,.2);}
+  .brand-logo{height:48px;} .brand-iso{height:46px;} .brand-tagline{height:40px;}
+  h1 { color:#fff; font-size:20px; margin:4px 0 12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .card { background:#fff; border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,.18); }
+  label { font-size:13px; font-weight:600; color:#44526e; display:block; margin-bottom:4px; }
+  input { width:100%; padding:9px 10px; border:1px solid #c9d3e6; border-radius:8px; font-size:15px; font-family:inherit; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
+  .bt { background:#0b3d91; color:#fff; border:0; border-radius:8px; padding:10px 16px; font-weight:700; font-size:15px; cursor:pointer; }
+  .bt:disabled { opacity:.5; cursor:default; }
+  .bt.sec { background:#e8eef9; color:#0b3d91; }
+  .bt.peq { padding:6px 10px; font-size:13px; }
+  .dica { font-size:12px; color:#6b778f; margin-top:4px; }
+  .erro { color:#b00020; font-size:14px; margin-top:8px; }
+  .pill { display:inline-block; border-radius:20px; padding:2px 10px; font-size:12px; font-weight:700; }
+  .pill.on { background:#d9f5e1; color:#167a3a; } .pill.off { background:#fde2e2; color:#b00020; }
+  .ped { border:1px solid #e3e8f0; border-radius:10px; padding:10px 12px; margin-bottom:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .ped .info { flex:1; min-width:220px; font-size:14px; }
+  .ped .sub { font-size:12px; color:#6b778f; }
+  .st { font-size:12px; font-weight:700; border-radius:6px; padding:3px 8px; white-space:nowrap; }
+  .st.pendente { background:#fff3cd; color:#8a6100; } .st.processando { background:#dbe8ff; color:#0b3d91; }
+  .st.pronto { background:#d9f5e1; color:#167a3a; } .st.erro { background:#fde2e2; color:#b00020; }
+  .topo { display:flex; justify-content:space-between; align-items:center; color:#dce6f7; font-size:13px; margin-bottom:8px; flex-wrap:wrap; gap:6px; }
+  .topo a { color:#fff; cursor:pointer; text-decoration:underline; }
+  #tela-login .card { max-width:380px; margin:30px auto; }
+  .oculto { display:none !important; }
+  .vazio { color:#6b778f; font-style:italic; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand-header" id="cab"></div>
+
+  <!-- APP -->
+  <div id="tela-app" class="oculto">
+        <h1>Períodos com o veículo DESLIGADO <span class="pill" id="servidor">verificando servidor...</span></h1>
+    <div class="card">
+      <div class="grid">
+        <div><label>Placa</label><input id="f-placa" placeholder="ex.: RXU6I96" style="text-transform:uppercase"><div class="dica">uma ou mais, separadas por vírgula</div></div>
+        <div><label>Motorista</label><input id="f-motorista" placeholder="opcional"><div class="dica">procura em qual veículo ele está agora</div></div>
+        <div><label>Início</label><input id="f-ini" type="datetime-local"></div>
+        <div><label>Fim</label><input id="f-fim" type="datetime-local"></div>
+        <div><label>Mínimo (min)</label><input id="f-min" type="number" min="0" value="5"><div class="dica">ignora desligados menores que isso</div></div>
+      </div>
+      <div style="height:12px"></div>
+      <button class="bt" id="f-pedir">Gerar relatório</button>
+      <div class="erro" id="f-erro"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 10px;color:#0b3d91;font-size:16px">Meus relatórios</h3>
+      <div id="lista"><div class="vazio">Carregando...</div></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { auth, db } from '../firebase-config.js';
+import { LOGO, ISO, SLOGAN } from './marca.js';
+import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { collection, addDoc, doc, onSnapshot, query, where, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+$('#cab').innerHTML = `<img class="brand-logo" src="${LOGO}" alt="MIR"><img class="brand-iso" src="${ISO}" alt="ISO 9001"><img class="brand-tagline" src="${SLOGAN}" alt="O seu sucesso é o nosso destino">`;
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+const pad = (n) => String(n).padStart(2, '0');
+const localISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const br = (iso) => { const [d, h] = String(iso || '').split('T'); const [a, m, dd] = (d || '').split('-'); return `${dd}/${m}/${a} ${h || ''}`; };
+const dur = (s) => { const m = Math.round(s / 60), h = Math.floor(m / 60); return h ? `${h}h${pad(m % 60)}` : `${m} min`; };
+
+// ------------------------------------------------------------------ acesso (sem login, igual ao app TG)
+// se o navegador ja estiver logado no Portal, usa esse login; senao entra como anonimo
+function entrarAnonimo() {
+  signInAnonymously(auth).catch((e) => {
+    $('#tela-app').classList.remove('oculto');
+    $('#lista').innerHTML = `<div class="erro">Não consegui conectar (${esc(e.code || e.message)}).</div>`;
+  });
+}
+let pararLista = null, pararServidor = null, usuario = null;
+onAuthStateChanged(auth, (user) => {
+  $('#tela-app').classList.toggle('oculto', !user);
+  if (pararLista) { pararLista(); pararLista = null; }
+  if (pararServidor) { pararServidor(); pararServidor = null; }
+  usuario = user;
+  if (!user) { entrarAnonimo(); return; }
+  iniciarApp(user);
+});
+
+// ------------------------------------------------------------------ app
+let pedidos = [];
+function iniciarApp(user) {
+  const agora = new Date(); agora.setSeconds(0, 0);
+  const ontem = new Date(agora); ontem.setDate(ontem.getDate() - 1); ontem.setHours(0, 0);
+  try {   // abre com a ultima placa/minimo usados
+    const ult = JSON.parse(localStorage.getItem('vd_ultimo') || '{}');
+    if (ult.placa) $('#f-placa').value = ult.placa;
+    if (ult.minimo != null) $('#f-min').value = ult.minimo;
+  } catch (e) {}
+  if (!$('#f-ini').value) $('#f-ini').value = localISO(ontem);
+  if (!$('#f-fim').value) $('#f-fim').value = localISO(agora);
+
+  pararServidor = onSnapshot(doc(db, 'desligado_servidor', 'status'), (s) => {
+    const d = s.data() || {};
+    const ult = d.ultimoSinal?.toDate ? d.ultimoSinal.toDate() : null;
+    const on = ult && (Date.now() - ult.getTime()) < 3 * 60 * 1000 && !(d.desligadoEm?.toDate && d.desligadoEm.toDate() >= ult);
+    $('#servidor').className = 'pill ' + (on ? 'on' : 'off');
+    $('#servidor').textContent = on ? 'servidor no ar' : 'servidor desligado — o pedido fica na fila';
+  }, () => { $('#servidor').textContent = ''; });
+
+  pararLista = onSnapshot(query(collection(db, 'desligado_pedidos'), where('criadoPor', '==', user.uid)), (sn) => {
+    pedidos = sn.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.criadoEm?.seconds || 9e12) - (a.criadoEm?.seconds || 9e12));
+    pintarLista();
+  }, (e) => { $('#lista').innerHTML = `<div class="erro">Não consegui ler os relatórios (${esc(e.code || e.message)}).</div>`; });
+}
+
+function pintarLista() {
+  if (!pedidos.length) { $('#lista').innerHTML = '<div class="vazio">Nenhum relatório ainda.</div>'; return; }
+  const rotulo = { pendente: 'na fila', processando: 'gerando...', pronto: 'pronto', erro: 'erro' };
+  $('#lista').innerHTML = pedidos.map(p => {
+    const res = (p.resumo || []).map(r => `${esc(r.placa)}: ${r.periodos} período(s), ${dur(r.segundos)}`).join(' · ');
+    return `<div class="ped">
+      <div class="info"><b>${esc(p.placa || '')}${p.placa && p.motorista ? ' · ' : ''}${esc(p.motorista || '')}</b>
+        <div class="sub">${br(p.ini)} até ${br(p.fim)}${p.minimo ? ` · mín. ${p.minimo} min` : ''}</div>
+        ${res ? `<div class="sub">${res}</div>` : ''}
+        ${p.status === 'processando' && p.andamento ? `<div class="sub">${esc(p.andamento)}</div>` : ''}
+        ${p.status === 'erro' ? `<div class="erro" style="margin-top:2px">${esc(p.erro || '')}</div>` : ''}</div>
+      <span class="st ${p.status}">${rotulo[p.status] || esc(p.status)}</span>
+      ${p.status === 'pronto' ? `<button class="bt peq" data-abrir="${p.id}">Abrir relatório</button>` : ''}
+      <button class="bt sec peq" data-apagar="${p.id}" title="Apagar da lista">✕</button>
+    </div>`;
+  }).join('');
+}
+
+$('#lista').addEventListener('click', async (e) => {
+  const a = e.target.closest('[data-abrir]');
+  if (a) {
+    const p = pedidos.find(x => x.id === a.dataset.abrir);
+    const url = URL.createObjectURL(new Blob([p.html || ''], { type: 'text/html' }));
+    window.open(url, '_blank') || (location.href = url);
+    return;
+  }
+  const d = e.target.closest('[data-apagar]');
+  if (d && confirm('Apagar este relatório da lista?')) {
+    try { await deleteDoc(doc(db, 'desligado_pedidos', d.dataset.apagar)); } catch (err) { alert('Não foi possível apagar: ' + (err.code || err.message)); }
+  }
+});
+
+$('#f-pedir').onclick = async () => {
+  $('#f-erro').textContent = '';
+  const placa = $('#f-placa').value.toUpperCase().replace(/[^A-Z0-9, ]/g, '').trim();
+  const motorista = $('#f-motorista').value.trim();
+  const ini = $('#f-ini').value, fim = $('#f-fim').value;
+  const minimo = Math.max(0, parseInt($('#f-min').value || '0', 10) || 0);
+  if (!placa && !motorista) { $('#f-erro').textContent = 'Informe a placa e/ou o motorista.'; return; }
+  if (!ini || !fim || fim <= ini) { $('#f-erro').textContent = 'O fim tem que ser depois do início.'; return; }
+  if ((new Date(fim) - new Date(ini)) > 92 * 86400000) { $('#f-erro').textContent = 'Período máximo: 3 meses por relatório.'; return; }
+  $('#f-pedir').disabled = true;
+  try {
+    await addDoc(collection(db, 'desligado_pedidos'), {
+      placa, motorista, ini, fim, minimo, status: 'pendente',
+      criadoPor: usuario.uid, criadoPorEmail: '', criadoEm: serverTimestamp()
+    });
+    try { localStorage.setItem('vd_ultimo', JSON.stringify({ placa, minimo })); } catch (e) {}
+  } catch (e) {
+    $('#f-erro').textContent = 'Não foi possível enviar: ' + (e.code || e.message || e);
+  } finally { $('#f-pedir').disabled = false; }
+};
+</script>
+</body>
+</html>

@@ -315,7 +315,7 @@
     import { auth, db } from '../firebase-config.js';
     import {
       collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, addDoc,
-      getDocs, serverTimestamp, writeBatch
+      getDocs, getDoc, serverTimestamp, writeBatch
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { initLayout, escapeHtml, LOGO_URL } from '../assets/layout.js?v=10';
 
@@ -682,7 +682,8 @@
           revisao: interpretado.revisao,
           conteudo: texto,
           conteudoFormato: 'html',
-          nomeArquivo: arquivo.name
+          nomeArquivo: arquivo.name,
+          arquivo                       // o .docx original (vai junto, pra baixar depois)
         };
 
         // Se dois arquivos selecionados caem no mesmo código, fica só a
@@ -858,9 +859,20 @@
             atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
           };
           if (!existente) payload.dataCriacao = hojeISO();
-          if (new Blob([c.conteudo || '']).size > 950000) throw new Error('conteúdo maior que o limite de 1 MB do Firebase');
+          if (new Blob([c.conteudo || '']).size > 950000) {
+            // imagens grandes estouram o limite de 1 MB do documento: o texto fica sem
+            // as imagens e o Word original (com tudo) fica disponível pra baixar
+            payload.conteudo = (c.conteudo || '').replace(/<img[^>]*>/gi, '') +
+              '<p><em>(As imagens deste documento estão no Word original — use "Baixar Word original".)</em></p>';
+          }
+          if (new Blob([payload.conteudo || '']).size > 950000) throw new Error('conteúdo maior que o limite de 1 MB do Firebase');
+          if (c.arquivo) payload.arquivoOriginal = c.nomeArquivo;
           lote.set(docRef, payload, { merge: true });
           await lote.commit();
+          if (c.arquivo) {
+            try { await salvarArquivoOriginal(chave, c.arquivo); }
+            catch (e) { console.error('Original não subiu', c.nomeArquivo, e); falhas.push(`${c.nomeArquivo} (texto ok, Word original não subiu)`); }
+          }
 
           ok++;
         } catch (err) {
@@ -880,6 +892,45 @@
         </div>
       `;
       document.getElementById('doc-import-fechar-resultado').addEventListener('click', () => { area.innerHTML = ''; });
+    }
+
+    // ---------------------------------------------------------------
+    // WORD ORIGINAL — guardado no próprio Firestore (sem Storage), em
+    // pedaços de ~900 KB: biblioteca_arquivos/{chave} + partes/{n}
+    // ---------------------------------------------------------------
+    const PEDACO_B64 = 900000;
+    async function salvarArquivoOriginal(chave, arquivo) {
+      const bytes = new Uint8Array(await arquivo.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      const b64 = btoa(bin);
+      const partes = Math.ceil(b64.length / PEDACO_B64) || 1;
+      const ref = doc(db, 'biblioteca_arquivos', chave);
+      for (let k = 0; k < partes; k++) {
+        await setDoc(doc(ref, 'partes', String(k)), { d: b64.slice(k * PEDACO_B64, (k + 1) * PEDACO_B64) });
+      }
+      await setDoc(ref, { nome: arquivo.name, tamanho: arquivo.size, partes,
+        tipo: arquivo.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        enviadoEm: serverTimestamp(), enviadoPor: auth.currentUser?.email || '' });
+    }
+    async function baixarArquivoOriginal(chave, btn) {
+      const orig = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Baixando...'; }
+      try {
+        const ref = doc(db, 'biblioteca_arquivos', chave);
+        const meta = await getDoc(ref);
+        if (!meta.exists()) throw new Error('o Word original deste documento ainda não foi enviado');
+        const m = meta.data();
+        const sn = await getDocs(collection(ref, 'partes'));
+        const b64 = sn.docs.filter(x => Number(x.id) < (m.partes || 999)).sort((a, b) => Number(a.id) - Number(b.id)).map(x => x.data().d).join('');
+        const bin = atob(b64), u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([u8], { type: m.tipo }));
+        const a = document.createElement('a'); a.href = url; a.download = m.nome || (chave + '.docx');
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (e) { alert('Não foi possível baixar: ' + (e.message || e)); }
+      finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
     }
 
     // ---------------------------------------------------------------
@@ -904,6 +955,7 @@
           <div>
             <label class="doc-copia-controlada-opcao"><input type="checkbox" id="doc-chk-copia-controlada"> Cópia controlada</label>
             <button type="button" class="qc-btn" id="doc-btn-exportar-pdf"><i class="bi bi-file-earmark-pdf"></i> Exportar em PDF</button>
+            ${d.arquivoOriginal ? `<button type="button" class="qc-btn" id="doc-btn-baixar-word" title="${escapeHtml(d.arquivoOriginal)}"><i class="bi bi-file-earmark-word"></i> Baixar Word original</button>` : ''}
           </div>
           ${podeEditar ? `<button type="button" class="qc-btn qc-btn-primary" id="doc-btn-editar-do-drawer">Editar / nova revisão</button>` : ''}
         </div>
@@ -914,6 +966,8 @@
       `;
 
       document.getElementById('doc-btn-exportar-pdf').addEventListener('click', () => exportarPdf(d));
+      const bWord = document.getElementById('doc-btn-baixar-word');
+      if (bWord) bWord.addEventListener('click', () => baixarArquivoOriginal(id, bWord));
       document.getElementById('doc-btn-tela-cheia').addEventListener('click', alternarTelaCheia);
       if (podeEditar) {
         document.getElementById('doc-btn-editar-do-drawer').addEventListener('click', () => abrirEdicao(id));

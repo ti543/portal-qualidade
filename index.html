@@ -313,7 +313,8 @@
 
   onAuthStateChanged(auth, async (user) => {
     const telaLogin = document.getElementById('qc-login-screen');
-    if (user) {
+    // acesso anonimo (app Veiculo Desligado no mesmo navegador) nao conta como login do portal
+    if (user && !user.isAnonymous) {
       telaLogin.style.display = 'none';
       await carregarOuCriarPerfil(user);
       await carregarModulos();

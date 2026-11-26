@@ -393,7 +393,7 @@ export function initLayout({
 
   return new Promise((resolve, reject) => {
     onAuthStateChanged(auth, async (user) => {
-      if (!user) {
+      if (!user || user.isAnonymous) {   // anonimo = app Veiculo Desligado, nao e login do portal
         window.location.href = homeHref;
         return;
       }

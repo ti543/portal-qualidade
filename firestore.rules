@@ -217,6 +217,30 @@ service cloud.firestore {
       }
     }
 
+    // App "Veiculo Desligado" (RH): sem login, igual ao app TG (acesso anonimo do Firebase);
+    // cada aparelho so ve os pedidos que ele mesmo fez. O atendente no servidor (sa.json,
+    // fora destas regras) gera o relatorio na Raster.
+    match /desligado_pedidos/{id} {
+      allow create: if logado()
+                    && request.resource.data.criadoPor == request.auth.uid
+                    && request.resource.data.status == "pendente";
+      allow read, delete: if logado()
+                    && (resource.data.criadoPor == request.auth.uid || souQualidade());
+    }
+    match /desligado_servidor/{id} {
+      allow read: if logado();
+    }
+
+    // Word original de cada documento da Biblioteca (sem Storage: base64 em pedaços)
+    match /biblioteca_arquivos/{id} {
+      allow read: if temPermissao("documentos") || temPermissao("auditorias");
+      allow write: if souQualidade();
+      match /partes/{n} {
+        allow read: if temPermissao("documentos") || temPermissao("auditorias");
+        allow write: if souQualidade();
+      }
+    }
+
     // ------------------------------------------------------------------
     // RESULTADO POR VEÍCULO
     // - veiculos_frota: cadastro central de placas (substitui o Placas.xlsm
