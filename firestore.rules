@@ -207,7 +207,8 @@ service cloud.firestore {
     // subcoleção, pra manter o controle de versão exigido pela ISO 9001.
     // ------------------------------------------------------------------
     match /biblioteca_documentos/{id} {
-      allow read: if temPermissao("documentos");
+      // auditores também leem (pra escolher os documentos auditados)
+      allow read: if temPermissao("documentos") || temPermissao("auditorias");
       allow write: if souQualidade();
 
       match /versoes_obsoletas/{verId} {
@@ -268,6 +269,42 @@ service cloud.firestore {
     // ------------------------------------------------------------------
     match /rg10_requisitos_legais/{id} {
       allow read, write: if souQualidade();
+    }
+    // ------------------------------------------------------------------
+    // AUDITORIAS INTERNAS (PG 02) — RG 11, RG 12, RG 13, RG 71
+    // - auditorias: quem tem o módulo cria e preenche (auditores das
+    //   unidades, no celular); só a qualidade exclui.
+    // - fotos de cada auditoria: subcoleção, uma foto (JPEG ~200 KB) por doc.
+    // - modelos de checklist, programa anual (RG 11) e encerramento (RG 13):
+    //   todos com o módulo leem, só a qualidade edita.
+    // ------------------------------------------------------------------
+    match /auditorias/{id} {
+      allow read: if temPermissao("auditorias");
+      allow create, update: if temPermissao("auditorias");
+      allow delete: if souQualidade();
+
+      match /fotos/{fotoId} {
+        allow read: if temPermissao("auditorias");
+        allow create: if temPermissao("auditorias") && request.resource.data.dados is string
+          && request.resource.data.dados.size() < 1000000;
+        allow delete: if temPermissao("auditorias");
+        allow update: if false;
+      }
+    }
+
+    match /auditoria_modelos/{id} {
+      allow read: if temPermissao("auditorias");
+      allow write: if souQualidade();
+    }
+
+    match /auditoria_programa/{ano} {
+      allow read: if temPermissao("auditorias");
+      allow write: if souQualidade();
+    }
+
+    match /auditoria_encerramentos/{ano} {
+      allow read: if temPermissao("auditorias");
+      allow write: if souQualidade();
     }
   }
 }

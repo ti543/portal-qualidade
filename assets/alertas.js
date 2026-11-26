@@ -118,6 +118,32 @@ const FONTES = {
   rg21: (db, perfil, vejoTudo) => ocorrenciasAbertas(db, perfil, vejoTudo, 'rg21_ocorrencias', 'Avaria/Reclamação'),
   // RG29 — Ocorrências abertas há muito tempo
   rg29: (db, perfil, vejoTudo) => ocorrenciasAbertas(db, perfil, vejoTudo, 'rg29_ocorrencias', 'Ocorrência'),
+
+  // Auditorias (PG 02): programadas (RG 11) que passaram do mês, auditorias
+  // abertas há muito tempo e não conformidades sem ação (RAM) definida
+  auditorias: async (db) => {
+    const out = [];
+    const ano = new Date().getFullYear(), mes = new Date().getMonth() + 1;
+    const prog = await getDoc(doc(db, 'auditoria_programa', String(ano)));
+    (prog.exists() ? prog.data().linhas || [] : []).forEach(l => {
+      if (l.auditoriaId || Number(l.mes) >= mes) return;
+      out.push({ nivel: mes - Number(l.mes) >= 2 ? 'critico' : 'atencao', titulo: `Auditoria programada atrasada: ${l.processo}${l.unidade ? ' ' + l.unidade : ''}`,
+        detalhe: `Prevista para ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][Number(l.mes) - 1]}/${ano}${l.auditor ? ' · Auditor: ' + l.auditor : ''}`, dias: mes - Number(l.mes) });
+    });
+    const snap = await getDocs(collection(db, 'auditorias'));
+    snap.forEach(d => {
+      const a = d.data();
+      const dt = parseISO(a.data);
+      if (a.status !== 'concluida' && dt && -diasEntre(dt) > PRAZOS.ocorrenciaAbertaDias) {
+        out.push({ nivel: 'atencao', titulo: `Auditoria ${a.numero || ''} (${a.processo || ''}) aberta há ${-diasEntre(dt)} dias`, detalhe: 'Conclua para gerar o relatório', dias: -diasEntre(dt) });
+      }
+      const semAcao = (a.itens || []).filter(i => i.resultado === 'NC' && !i.ram).length;
+      if (a.status === 'concluida' && semAcao) {
+        out.push({ nivel: 'critico', titulo: `${semAcao} NC sem ação (RAM) — auditoria ${a.numero || ''}`, detalhe: `${a.processo || ''}${a.unidade ? ' · ' + a.unidade : ''} · ${a.data ? fmt(parseISO(a.data)) : ''}`, dias: semAcao });
+      }
+    });
+    return out;
+  },
 };
 
 async function ocorrenciasAbertas(db, perfil, vejoTudo, colecao, rotulo) {

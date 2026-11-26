@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#000080">
+  <title>Auditorias internas - PG 02</title>
+  <link rel="icon" href="../assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon-192.png">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../assets/layout.css?v=10" rel="stylesheet">
+  <!-- PDF dos relatórios (RG 11, RG 12, RG 13, RG 71): mesma técnica dos outros módulos -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    .au-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+    .au-tab { border:1px solid #d6d9e6; background:#fff; color:#444; font-weight:600; font-size:13px; padding:8px 14px; border-radius:20px; cursor:pointer; white-space:nowrap; }
+    .au-tab i { margin-right:5px; }
+    .au-tab.active { background:var(--qc-primary); color:#fff; border-color:var(--qc-primary); }
+    .au-kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:18px; }
+    .au-kpi { background:#fff; border-radius:10px; padding:14px 16px; box-shadow:0 2px 10px rgba(0,0,0,.07); border-left:4px solid var(--qc-primary); }
+    .au-kpi .n { font-size:26px; font-weight:700; color:var(--qc-primary); line-height:1; }
+    .au-kpi .l { font-size:11.5px; color:#666; margin-top:6px; text-transform:uppercase; font-weight:600; letter-spacing:.3px; }
+    .au-kpi.nc { border-left-color:#c0392b; } .au-kpi.nc .n { color:#c0392b; }
+    .au-kpi.om { border-left-color:#e0a800; } .au-kpi.om .n { color:#9a6b00; }
+    .au-kpi.ok { border-left-color:#1e7e34; } .au-kpi.ok .n { color:#1e7e34; }
+
+    .au-lista-item { background:#fff; border-radius:10px; padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:10px; display:flex; gap:12px; align-items:center; cursor:pointer; border-left:4px solid #adb5bd; }
+    .au-lista-item:hover { box-shadow:0 4px 14px rgba(0,0,0,.12); }
+    .au-lista-item.em_andamento { border-left-color:#0d6efd; }
+    .au-lista-item.concluida { border-left-color:#1e7e34; }
+    .au-lista-item .num { font-weight:700; color:var(--qc-primary); font-size:15px; min-width:56px; }
+    .au-lista-item .tit { font-weight:600; font-size:14px; }
+    .au-lista-item .sub { font-size:12px; color:#777; }
+    .au-lista-item .cont { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .au-pill { font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:12px; white-space:nowrap; }
+    .au-pill.c { background:#e6f4ea; color:#1e7e34; } .au-pill.nc { background:#fdeaea; color:#c0392b; }
+    .au-pill.om { background:#fff4d6; color:#9a6b00; } .au-pill.na { background:#eee; color:#666; }
+    .au-pill.st { background:#e7f0ff; color:#0d47a1; } .au-pill.fim { background:#e6f4ea; color:#1e7e34; }
+
+    /* ---------- EXECUÇÃO (pensada pra usar no celular) ---------- */
+    .au-exec-topo { background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 2px 10px rgba(0,0,0,.07); margin-bottom:12px; }
+    .au-exec-topo h2 { font-size:17px; font-weight:700; color:var(--qc-primary); margin:0 0 4px; }
+    .au-exec-topo .meta { font-size:12.5px; color:#555; display:flex; flex-wrap:wrap; gap:4px 14px; }
+    .au-progresso { height:8px; background:#e9ecef; border-radius:4px; overflow:hidden; margin:10px 0 6px; }
+    .au-progresso > div { height:100%; background:linear-gradient(90deg,#000080,#3d5afe); transition:width .3s; }
+    .au-salvo { font-size:11.5px; color:#888; }
+    .au-salvo.erro { color:#c0392b; font-weight:600; }
+    .au-filtros { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px; position:sticky; top:0; z-index:5; background:var(--qc-bg); padding-top:6px; }
+    .au-item { background:#fff; border-radius:12px; padding:14px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:12px; border-left:5px solid #dee2e6; }
+    .au-item.r-C { border-left-color:#1e7e34; } .au-item.r-NC { border-left-color:#c0392b; }
+    .au-item.r-OM { border-left-color:#e0a800; } .au-item.r-NA { border-left-color:#adb5bd; }
+    .au-item .cab { font-size:11px; color:#777; font-weight:600; text-transform:uppercase; letter-spacing:.3px; display:flex; gap:8px; flex-wrap:wrap; }
+    .au-item .cab .iso { color:var(--qc-primary); }
+    .au-item .perg { font-size:14.5px; font-weight:600; color:#222; margin:6px 0 10px; line-height:1.35; }
+    .au-res { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
+    .au-res button { border:1.5px solid #d6d9e6; background:#fff; border-radius:9px; padding:10px 4px; font-weight:700; font-size:12.5px; color:#555; line-height:1.1; }
+    .au-res button i { display:block; font-size:18px; margin-bottom:3px; }
+    .au-res button.on-C { background:#1e7e34; border-color:#1e7e34; color:#fff; }
+    .au-res button.on-NC { background:#c0392b; border-color:#c0392b; color:#fff; }
+    .au-res button.on-OM { background:#e0a800; border-color:#e0a800; color:#fff; }
+    .au-res button.on-NA { background:#6c757d; border-color:#6c757d; color:#fff; }
+    .au-item textarea { width:100%; border:1px solid #d6d9e6; border-radius:8px; padding:8px 10px; font-size:13.5px; min-height:64px; resize:vertical; }
+    .au-fotos { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .au-foto { width:78px; height:78px; border-radius:8px; overflow:hidden; position:relative; background:#eee; cursor:pointer; }
+    .au-foto img { width:100%; height:100%; object-fit:cover; }
+    .au-foto .x { position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; line-height:22px; padding:0; }
+    .au-foto.enviando::after { content:''; position:absolute; inset:0; background:rgba(255,255,255,.6) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 50 50"><circle cx="25" cy="25" r="20" fill="none" stroke="%23000080" stroke-width="5" stroke-dasharray="90 60"><animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/></circle></svg>') center no-repeat; }
+    .au-add-foto { width:78px; height:78px; border-radius:8px; border:2px dashed #b8bfd6; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--qc-primary); font-size:11px; font-weight:600; cursor:pointer; background:#f7f8fc; }
+    .au-add-foto i { font-size:22px; }
+    .au-extra { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+    .au-extra input { border:1px solid #d6d9e6; border-radius:8px; padding:7px 10px; font-size:13px; width:100%; }
+    .au-rodape { position:sticky; bottom:0; background:rgba(244,245,249,.96); padding:10px 0; display:flex; gap:8px; flex-wrap:wrap; z-index:6; }
+    .au-rodape .btn { flex:1 1 auto; }
+
+    .au-exec-topo, .au-filtros, #ex-itens, .au-rodape { max-width:920px; }
+    .au-tabela { width:100%; font-size:12.5px; }
+    #pg-corpo select { min-width:82px; } #pg-corpo input { min-width:120px; } #pg-corpo input[data-c=processo], #pg-corpo input[data-c=documentos] { min-width:170px; } #pg-corpo input[type=date] { min-width:130px; }
+    .au-tabela th { background:#eef1fa; color:var(--qc-primary); font-size:11px; text-transform:uppercase; white-space:nowrap; }
+    .au-tabela td, .au-tabela th { padding:6px 8px; vertical-align:middle; }
+    .au-tabela input, .au-tabela select, .au-tabela textarea { font-size:12.5px; }
+    .au-mes-x { text-align:center; font-weight:700; color:var(--qc-primary); }
+    .au-assinatura { border:1.5px dashed #b8bfd6; border-radius:8px; background:#fff; width:100%; height:150px; touch-action:none; }
+    .au-barras .lin { display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:6px; }
+    .au-barras .lin .nome { width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .au-barras .lin .barra { flex:1; background:#f0f1f6; border-radius:4px; height:14px; overflow:hidden; display:flex; }
+    .au-barras .lin .barra span { height:100%; }
+    .au-vazio { text-align:center; color:#888; padding:24px; font-size:13px; }
+    .au-doc-lista { max-height:260px; overflow:auto; border:1px solid #e3e6ef; border-radius:8px; padding:6px 10px; }
+    .au-doc-lista label { display:block; font-size:12.5px; padding:3px 0; }
+    #au-visualizar-foto img { max-width:100%; max-height:80vh; display:block; margin:auto; }
+
+    /* bloco "fotografado" pro PDF — fica fora da tela */
+    .au-pdf { position:fixed; left:-10000px; top:0; width:760px; background:#fff; font-family:'Inter','Segoe UI',Tahoma,sans-serif; color:#000; font-size:12px; }
+    .au-pdf .cab { display:flex; align-items:stretch; border:1.5px solid #333; border-radius:4px; overflow:hidden; margin-bottom:12px; }
+    .au-pdf .cab .logo { flex:0 0 150px; display:flex; align-items:center; justify-content:center; padding:8px 12px; border-right:1.5px solid #333; }
+    .au-pdf .cab .logo img { max-width:100%; max-height:46px; }
+    .au-pdf .cab .tit { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; font-weight:700; font-size:14.5px; padding:8px 14px; border-right:1.5px solid #333; }
+    .au-pdf .cab table { flex:0 0 210px; border-collapse:collapse; font-size:11px; }
+    .au-pdf .cab table th, .au-pdf .cab table td { padding:4px 9px; text-align:left; white-space:nowrap; }
+    .au-pdf .cab table tr:not(:last-child) th, .au-pdf .cab table tr:not(:last-child) td { border-bottom:1px solid #333; }
+    .au-pdf .cab table td { text-align:right; font-weight:700; color:#000050; width:100%; }
+    .au-pdf table.t { width:100%; border-collapse:collapse; margin-bottom:12px; }
+    .au-pdf table.t th, .au-pdf table.t td { border:1px solid #333; padding:5px 7px; text-align:left; vertical-align:top; }
+    .au-pdf table.t th { background:#eef2ff; font-size:10.5px; text-transform:uppercase; }
+    .au-pdf .secao { background:#000080; color:#fff; font-weight:700; padding:5px 8px; font-size:12px; margin:12px 0 0; }
+    .au-pdf .res { font-weight:700; text-align:center; white-space:nowrap; }
+    .au-pdf .res.C { color:#1e7e34; } .au-pdf .res.NC { color:#c0392b; } .au-pdf .res.OM { color:#9a6b00; }
+    .au-pdf .fotos { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:8px; }
+    .au-pdf .fotos figure { margin:0; border:1px solid #999; padding:4px; }
+    .au-pdf .fotos img { width:100%; height:250px; object-fit:contain; background:#f4f4f4; }
+    .au-pdf .fotos figcaption { font-size:10.5px; margin-top:3px; }
+    .au-pdf .ass { display:flex; gap:30px; margin-top:26px; }
+    .au-pdf .ass div { flex:1; text-align:center; font-size:11.5px; }
+    .au-pdf .ass img { height:70px; display:block; margin:0 auto; }
+    .au-pdf .ass .linha { border-top:1px solid #000; margin-top:4px; padding-top:3px; }
+    .au-pdf .mes { text-align:center; font-weight:700; width:28px; }
+
+    @media (max-width: 600px) {
+      .au-lista-item { flex-wrap:wrap; }
+      .au-lista-item .cont { margin-left:0; justify-content:flex-start; width:100%; }
+      .au-extra { grid-template-columns:1fr; }
+      .au-tab { font-size:12px; padding:7px 11px; }
+    }
+  </style>
+</head>
+<body class="qc-body">
+<div id="qc-page-content">
+  <div id="au-carregando" class="au-vazio">Carregando...</div>
+
+  <div id="au-app" style="display:none;">
+    <div class="au-tabs" id="au-tabs">
+      <button class="au-tab" data-tab="painel"><i class="bi bi-speedometer2"></i>Painel</button>
+      <button class="au-tab" data-tab="auditorias"><i class="bi bi-clipboard2-check"></i>Auditorias</button>
+      <button class="au-tab" data-tab="programa"><i class="bi bi-calendar3"></i>Programa (RG 11)</button>
+      <button class="au-tab" data-tab="encerramento"><i class="bi bi-journal-check"></i>Encerramento (RG 13)</button>
+      <button class="au-tab so-qualidade" data-tab="modelos"><i class="bi bi-list-check"></i>Modelos de checklist</button>
+    </div>
+    <div id="au-conteudo"></div>
+  </div>
+</div>
+
+<!-- Nova auditoria / editar cabeçalho -->
+<div class="modal fade" id="modal-auditoria" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="ma-titulo">Nova auditoria</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Tipo</label>
+            <select id="ma-tipo" class="form-select">
+              <option value="sistema">Auditoria de sistema (RG 12)</option>
+              <option value="relampago">Auditoria relâmpago (RG 71)</option>
+            </select>
+          </div>
+          <div class="col-md-8" id="ma-modelo-box">
+            <label class="form-label">Checklist (modelo)</label>
+            <select id="ma-modelo" class="form-select"></select>
+          </div>
+          <div class="col-md-6"><label class="form-label">Processo</label><input id="ma-processo" class="form-control" list="dl-processos"></div>
+          <div class="col-md-3">
+            <label class="form-label">Unidade</label>
+            <select id="ma-unidade" class="form-select"></select>
+          </div>
+          <div class="col-md-3"><label class="form-label">Data</label><input id="ma-data" type="date" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">Auditor(es)</label><input id="ma-auditores" class="form-control" list="dl-pessoas" placeholder="Separe por vírgula"></div>
+          <div class="col-md-6"><label class="form-label">Responsável pelo processo (auditado)</label><input id="ma-responsavel" class="form-control" list="dl-pessoas"></div>
+          <div class="col-md-12"><label class="form-label">Normas de referência</label><input id="ma-normas" class="form-control" value="ISO 9001:2015"></div>
+          <div class="col-md-12">
+            <label class="form-label">Documentos auditados</label>
+            <input id="ma-doc-busca" class="form-control form-control-sm mb-2" placeholder="Buscar na Biblioteca de Documentos (PG, IT, MQ...)">
+            <div class="au-doc-lista" id="ma-doc-lista"></div>
+            <input id="ma-docs-livre" class="form-control form-control-sm mt-2" placeholder="Outros documentos (texto livre)">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" id="ma-salvar">Começar auditoria</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Concluir (assinaturas) -->
+<div class="modal fade" id="modal-concluir" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Concluir auditoria</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="mc-resumo" class="mb-3"></div>
+        <label class="form-label fw-semibold">Assinatura do auditor <span class="text-muted fw-normal" id="mc-nome-auditor"></span></label>
+        <canvas class="au-assinatura" id="mc-ass-auditor"></canvas>
+        <button class="btn btn-sm btn-link px-0" data-limpar="mc-ass-auditor">Limpar</button>
+        <label class="form-label fw-semibold mt-2">Assinatura do auditado <span class="text-muted fw-normal" id="mc-nome-auditado"></span></label>
+        <canvas class="au-assinatura" id="mc-ass-auditado"></canvas>
+        <button class="btn btn-sm btn-link px-0" data-limpar="mc-ass-auditado">Limpar</button>
+        <p class="small text-muted mt-2 mb-0">As assinaturas são opcionais — se o auditado não estiver junto, conclua sem e assine no papel impresso.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Voltar</button>
+        <button class="btn btn-success" id="mc-confirmar"><i class="bi bi-check2-circle"></i> Concluir e gerar relatório</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Foto ampliada -->
+<div class="modal fade" id="modal-foto" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
+    <div class="modal-body p-2" id="au-visualizar-foto"></div>
+  </div></div>
+</div>
+
+<datalist id="dl-processos"></datalist>
+<datalist id="dl-pessoas"></datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module">
+import { auth, db } from '../firebase-config.js';
+import {
+  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, orderBy, where,
+  runTransaction, writeBatch, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initLayout, escapeHtml as esc, LOGO_URL } from '../assets/layout.js?v=10';
+import { MODELOS_PADRAO } from '../assets/auditorias-modelos.js?v=1';
+
+/* =========================================================================
+   AUDITORIAS INTERNAS (PG 02)
+   - auditorias/{id}               cabeçalho + itens do checklist (respostas)
+   - auditorias/{id}/fotos/{id}     uma foto por documento (JPEG comprimido no celular)
+   - auditoria_modelos/{id}         checklists por processo (editáveis pela qualidade)
+   - auditoria_programa/{ano}       RG 11 do ano
+   - auditoria_encerramentos/{ano}  RG 13 do ano
+   As fotos ficam no próprio Firestore (e não no Storage) porque assim o PDF
+   consegue "fotografar" as imagens sem esbarrar em CORS.
+   ========================================================================= */
+
+const UNIDADES = ['MTZ', 'RSL', 'GRU', 'ITJ', 'CTB', 'POA', 'CMP', 'Todas'];
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const RES = {
+  C:  { rot: 'Conforme', ico: 'bi-check-circle-fill', pill: 'c' },
+  NC: { rot: 'Não conforme', ico: 'bi-x-octagon-fill', pill: 'nc' },
+  OM: { rot: 'Melhoria', ico: 'bi-lightbulb-fill', pill: 'om' },
+  NA: { rot: 'N/A', ico: 'bi-slash-circle', pill: 'na' },
+};
+
+let perfil = null, souQualidade = false, usuarioEmail = '';
+let modelos = [], auditorias = [], biblioteca = [], isoCfg = {};
+let abaAtual = 'painel';
+let atual = null;               // auditoria aberta
+let fotosAtual = {};            // itemId -> [{id, dados, legenda}]
+let filtroExec = 'todos';
+let anoPrograma = new Date().getFullYear();
+let programa = null;
+let anoEnc = new Date().getFullYear();
+let encerramento = null;
+let modeloEditando = null;
+
+const $ = (s, el = document) => el.querySelector(s);
+const hojeISO = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const fmtBR = (s) => { if (!s) return ''; const [a, m, d] = String(s).slice(0, 10).split('-'); return d ? `${d}/${m}/${a}` : s; };
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const contar = (itens) => {
+  const c = { C: 0, NC: 0, OM: 0, NA: 0, resp: 0, total: itens.length };
+  itens.forEach(i => { if (i.resultado) { c[i.resultado]++; c.resp++; } });
+  return c;
+};
+function toast(msg, tipo = 'ok') {
+  let t = document.getElementById('au-toast');
+  if (!t) {
+    t = document.createElement('div'); t.id = 'au-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9999;padding:10px 18px;border-radius:24px;font-size:13.5px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:opacity .3s;max-width:90vw;text-align:center;';
+    document.body.appendChild(t);
+  }
+  t.style.background = tipo === 'erro' ? '#c0392b' : '#1f2a6b'; t.style.color = '#fff';
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._h); t._h = setTimeout(() => { t.style.opacity = '0'; }, 2600);
+}
+
+/* ------------------------------------------------------------------ carga */
+initLayout({
+  auth, db,
+  activeSlug: 'auditorias',
+  pageTitle: 'Auditorias internas (PG 02)',
+  breadcrumb: 'Qualidade',
+  isoDocId: 'auditorias',
+  isoCollection: 'modulo_config',
+  isoEditLevel: 'qualidade',
+  homeHref: '../'
+}).then(async (ctx) => {
+  perfil = ctx.perfil; souQualidade = ctx.souQualidade; usuarioEmail = ctx.user.email || '';
+  document.querySelectorAll('.so-qualidade').forEach(el => el.style.display = souQualidade ? '' : 'none');
+  try { await carregarTudo(); }
+  catch (e) {
+    console.error(e);
+    $('#au-carregando').innerHTML = 'Não foi possível carregar as auditorias: ' + esc(e.message || e) +
+      '<br><small>Se for "permission", as regras do Firestore ainda não foram publicadas com o módulo de auditorias.</small>';
+    return;
+  }
+  $('#au-carregando').style.display = 'none';
+  $('#au-app').style.display = '';
+  window.addEventListener('hashchange', rotear);
+  rotear();
+}).catch(err => console.error('Falha ao montar layout:', err));
+
+async function carregarTudo() {
+  const [snapMod, snapAud] = await Promise.all([
+    getDocs(collection(db, 'auditoria_modelos')),
+    getDocs(query(collection(db, 'auditorias'), orderBy('criadoEm', 'desc'))),
+  ]);
+  modelos = snapMod.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (!modelos.length && souQualidade) {
+    // 1ª vez: grava os checklists padrão
+    const b = writeBatch(db);
+    MODELOS_PADRAO.forEach((m, k) => {
+      const dados = { nome: m.nome, processo: m.processo, tipo: m.tipo, ordem: k,
+        itens: m.itens.map(x => ({ secao: x.s, isoItem: x.i, pergunta: x.p, docRef: x.d || '' })) };
+      b.set(doc(db, 'auditoria_modelos', m.id), dados);
+      modelos.push({ id: m.id, ...dados });
+    });
+    await b.commit();
+  }
+  modelos.sort((a, b) => (a.ordem ?? 99) - (b.ordem ?? 99) || a.nome.localeCompare(b.nome));
+  auditorias = snapAud.docs.map(d => ({ id: d.id, ...d.data() }));
+  try {
+    const sb = await getDocs(query(collection(db, 'biblioteca_documentos'), orderBy('codigo')));
+    biblioteca = sb.docs.map(d => ({ id: d.id, codigo: d.data().codigo || '', titulo: d.data().titulo || '', revisao: d.data().revisao || d.data().numRevisao || '' }));
+  } catch (e) { biblioteca = []; }
+  try { const s = await getDoc(doc(db, 'modulo_config', 'auditorias')); isoCfg = s.exists() ? s.data() : {}; } catch (e) { isoCfg = {}; }
+  montarDatalists();
+}
+
+function montarDatalists() {
+  const procs = new Set(modelos.map(m => m.processo));
+  auditorias.forEach(a => a.processo && procs.add(a.processo));
+  $('#dl-processos').innerHTML = [...procs].sort().map(p => `<option value="${esc(p)}">`).join('');
+  const pessoas = new Set();
+  auditorias.forEach(a => { (a.auditores || []).forEach(p => p && pessoas.add(p)); a.responsavel && pessoas.add(a.responsavel); });
+  $('#dl-pessoas').innerHTML = [...pessoas].sort().map(p => `<option value="${esc(p)}">`).join('');
+}
+
+/* ------------------------------------------------------------------ rotas */
+function rotear() {
+  const h = (location.hash || '#painel').slice(1);
+  const [aba, id] = h.split('/');
+  if (aba === 'auditoria' && id) { $('#au-conteudo').onclick = null; abrirAuditoria(id); marcarAba('auditorias'); return; }
+  abaAtual = ['painel', 'auditorias', 'programa', 'encerramento', 'modelos'].includes(aba) ? aba : 'painel';
+  if (abaAtual === 'modelos' && !souQualidade) abaAtual = 'painel';
+  marcarAba(abaAtual);
+  atual = null;
+  $('#au-conteudo').onclick = null;
+  ({ painel: renderPainel, auditorias: renderLista, programa: renderPrograma, encerramento: renderEncerramento, modelos: renderModelos })[abaAtual]();
+  window.scrollTo(0, 0);
+}
+function marcarAba(a) { document.querySelectorAll('.au-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === a)); }
+document.getElementById('au-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('.au-tab'); if (!b) return;
+  location.hash = b.dataset.tab;
+});
+
+/* ================================================================== PAINEL */
+function renderPainel() {
+  const ano = new Date().getFullYear();
+  const doAno = auditorias.filter(a => String(a.data || '').startsWith(String(ano)));
+  let nc = 0, om = 0, ncSemAcao = 0;
+  const porProc = {};
+  doAno.forEach(a => {
+    const c = contar(a.itens || []); nc += c.NC; om += c.OM;
+    (a.itens || []).forEach(i => { if (i.resultado === 'NC' && !i.ram) ncSemAcao++; });
+    const p = a.processo || '—'; porProc[p] = porProc[p] || { NC: 0, OM: 0, C: 0 };
+    porProc[p].NC += c.NC; porProc[p].OM += c.OM; porProc[p].C += c.C;
+  });
+  const andamento = auditorias.filter(a => a.status !== 'concluida');
+  const maxBar = Math.max(1, ...Object.values(porProc).map(v => v.NC + v.OM + v.C));
+  $('#au-conteudo').innerHTML = `
+    <div class="au-kpis">
+      <div class="au-kpi"><div class="n">${doAno.length}</div><div class="l">Auditorias em ${ano}</div></div>
+      <div class="au-kpi"><div class="n">${andamento.length}</div><div class="l">Em andamento</div></div>
+      <div class="au-kpi nc"><div class="n">${nc}</div><div class="l">Não conformidades</div></div>
+      <div class="au-kpi om"><div class="n">${om}</div><div class="l">Melhorias / obs.</div></div>
+      <div class="au-kpi ${ncSemAcao ? 'nc' : 'ok'}"><div class="n">${ncSemAcao}</div><div class="l">NC sem ação (RAM)</div></div>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="qc-card">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3 class="mb-0">Em andamento</h3>
+            <button class="btn btn-primary btn-sm" id="pn-nova"><i class="bi bi-plus-lg"></i> Nova auditoria</button>
+          </div>
+          ${andamento.length ? andamento.map(itemLista).join('') : '<div class="au-vazio">Nenhuma auditoria em andamento.</div>'}
+        </div>
+        <div class="qc-card" id="pn-proximas"><h3>Próximas do programa (RG 11)</h3><div class="au-vazio">Carregando...</div></div>
+      </div>
+      <div class="col-lg-6">
+        <div class="qc-card">
+          <h3>Resultado por processo — ${ano}</h3>
+          <p class="qc-hint">Verde: conforme · Vermelho: não conforme · Amarelo: melhoria/observação</p>
+          <div class="au-barras">
+            ${Object.keys(porProc).length ? Object.entries(porProc).sort((a, b) => b[1].NC - a[1].NC).map(([p, v]) => `
+              <div class="lin"><span class="nome" title="${esc(p)}">${esc(p)}</span>
+                <span class="barra">
+                  <span style="width:${v.C / maxBar * 100}%;background:#5cb85c"></span>
+                  <span style="width:${v.NC / maxBar * 100}%;background:#c0392b"></span>
+                  <span style="width:${v.OM / maxBar * 100}%;background:#e0a800"></span>
+                </span>
+                <span style="width:60px;text-align:right">${v.NC} NC</span></div>`).join('') : '<div class="au-vazio">Sem auditorias neste ano ainda.</div>'}
+          </div>
+        </div>
+        <div class="qc-card">
+          <h3>No celular</h3>
+          <p class="qc-hint mb-0">Abra o portal no celular e use <b>"Instalar app"</b> (ou "Adicionar à tela inicial"). A auditoria é feita direto na tela: marque Conforme / NC / Melhoria, escreva a evidência e tire as fotos pela câmera — tudo salva sozinho. No fim, o RG 12 (ou RG 71) sai em PDF já com as fotos.</p>
+        </div>
+      </div>
+    </div>`;
+  $('#au-conteudo').onclick = cliqueLista;
+  $('#pn-nova').onclick = () => abrirModalNova();
+  carregarProximas();
+}
+
+async function carregarProximas() {
+  const box = $('#pn-proximas'); if (!box) return;
+  try {
+    const s = await getDoc(doc(db, 'auditoria_programa', String(new Date().getFullYear())));
+    const linhas = s.exists() ? (s.data().linhas || []) : [];
+    const mesAtual = new Date().getMonth() + 1;
+    const prox = linhas.filter(l => !l.auditoriaId && Number(l.mes) >= mesAtual - 1)
+      .sort((a, b) => (a.dataPrevista || ('9' + a.mes)).localeCompare(b.dataPrevista || ('9' + b.mes))).slice(0, 8);
+    box.innerHTML = '<h3>Próximas do programa (RG 11)</h3>' + (prox.length ? `<table class="table table-sm au-tabela mb-0"><tbody>${prox.map(l => `
+      <tr><td><b>${esc(l.processo)}</b> <span class="text-muted">${esc(l.unidade || '')}</span></td>
+      <td>${l.dataPrevista ? fmtBR(l.dataPrevista) : MESES[(l.mes || 1) - 1]}</td><td>${esc(l.auditor || '')}</td>
+      ${Number(l.mes) < mesAtual ? '<td><span class="au-pill nc">atrasada</span></td>' : '<td></td>'}</tr>`).join('')}</tbody></table>`
+      : '<div class="au-vazio">Nada programado para os próximos meses. Monte o programa na aba "Programa (RG 11)".</div>');
+  } catch (e) { box.innerHTML = '<h3>Próximas do programa (RG 11)</h3><div class="au-vazio">Sem acesso ao programa.</div>'; }
+}
+
+/* ================================================================== LISTA */
+function itemLista(a) {
+  const c = contar(a.itens || []);
+  return `<div class="au-lista-item ${a.status || ''}" data-abrir="${a.id}">
+    <div class="num">${esc(a.numero || '—')}</div>
+    <div><div class="tit">${esc(a.processo || '')} ${a.unidade ? '· ' + esc(a.unidade) : ''}</div>
+      <div class="sub">${a.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'} · ${fmtBR(a.data)} · ${esc((a.auditores || []).join(', '))}</div></div>
+    <div class="cont">
+      ${a.status === 'concluida' ? '<span class="au-pill fim">concluída</span>' : `<span class="au-pill st">${c.resp}/${c.total}</span>`}
+      ${c.NC ? `<span class="au-pill nc">${c.NC} NC</span>` : ''}${c.OM ? `<span class="au-pill om">${c.OM} OM</span>` : ''}
+    </div></div>`;
+}
+function cliqueLista(e) {
+  const it = e.target.closest('[data-abrir]');
+  if (it) location.hash = 'auditoria/' + it.dataset.abrir;
+}
+
+let filtroLista = { texto: '', ano: String(new Date().getFullYear()), status: '' };
+function renderLista() {
+  const anos = [...new Set(auditorias.map(a => String(a.data || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  if (!anos.includes(filtroLista.ano)) anos.unshift(filtroLista.ano);
+  $('#au-conteudo').innerHTML = `
+    <div class="qc-card">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input class="form-control form-control-sm" style="max-width:260px" id="ls-busca" placeholder="Buscar processo, unidade, auditor..." value="${esc(filtroLista.texto)}">
+        <select class="form-select form-select-sm" style="max-width:110px" id="ls-ano"><option value="">Todos</option>${anos.map(a => `<option ${a === filtroLista.ano ? 'selected' : ''}>${a}</option>`).join('')}</select>
+        <select class="form-select form-select-sm" style="max-width:160px" id="ls-status">
+          <option value="">Todas</option><option value="em_andamento" ${filtroLista.status === 'em_andamento' ? 'selected' : ''}>Em andamento</option><option value="concluida" ${filtroLista.status === 'concluida' ? 'selected' : ''}>Concluídas</option></select>
+        <button class="btn btn-primary btn-sm ms-auto" id="ls-nova"><i class="bi bi-plus-lg"></i> Nova auditoria</button>
+      </div>
+      <div id="ls-itens"></div>
+    </div>`;
+  const pintar = () => {
+    const t = filtroLista.texto.toLowerCase();
+    const l = auditorias.filter(a => (!filtroLista.ano || String(a.data || '').startsWith(filtroLista.ano))
+      && (!filtroLista.status || (a.status || 'em_andamento') === filtroLista.status)
+      && (!t || `${a.numero} ${a.processo} ${a.unidade} ${(a.auditores || []).join(' ')} ${a.responsavel}`.toLowerCase().includes(t)));
+    $('#ls-itens').innerHTML = l.length ? l.map(itemLista).join('') : '<div class="au-vazio">Nenhuma auditoria encontrada.</div>';
+  };
+  pintar();
+  $('#ls-busca').oninput = (e) => { filtroLista.texto = e.target.value; pintar(); };
+  $('#ls-ano').onchange = (e) => { filtroLista.ano = e.target.value; pintar(); };
+  $('#ls-status').onchange = (e) => { filtroLista.status = e.target.value; pintar(); };
+  $('#ls-nova').onclick = () => abrirModalNova();
+  $('#ls-itens').onclick = cliqueLista;
+}
+
+/* ============================================================ NOVA AUDITORIA */
+const modalAud = () => bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-auditoria'));
+let novaCtx = null; // { linhaPrograma?, editarId? }
+let docsMarcados = new Set();
+
+function abrirModalNova(ctx = {}) {
+  novaCtx = ctx;
+  const ed = ctx.editarId ? auditorias.find(a => a.id === ctx.editarId) || atual : null;
+  $('#ma-titulo').textContent = ed ? `Editar cabeçalho — ${ed.numero}` : 'Nova auditoria';
+  $('#ma-salvar').textContent = ed ? 'Salvar' : 'Começar auditoria';
+  $('#ma-tipo').value = ed?.tipo || ctx.tipo || 'sistema';
+  $('#ma-tipo').disabled = !!ed;
+  $('#ma-modelo-box').style.display = ed ? 'none' : '';
+  $('#ma-unidade').innerHTML = UNIDADES.map(u => `<option>${u}</option>`).join('');
+  const lp = ctx.linhaPrograma || {};
+  $('#ma-processo').value = ed?.processo || lp.processo || ''; processoAuto = false;
+  $('#ma-unidade').value = ed?.unidade || lp.unidade || (perfil.unidade && UNIDADES.includes(perfil.unidade) ? perfil.unidade : 'MTZ');
+  $('#ma-data').value = ed?.data || hojeISO();
+  $('#ma-auditores').value = ed ? (ed.auditores || []).join(', ') : (lp.auditor || '');
+  $('#ma-responsavel').value = ed?.responsavel || lp.responsavel || '';
+  $('#ma-normas').value = ed?.normas || 'ISO 9001:2015';
+  docsMarcados = new Set(ed?.documentos || (lp.documentos ? String(lp.documentos).split(/\s*[,;]\s*/).filter(Boolean) : []));
+  $('#ma-docs-livre').value = '';
+  pintarModelosSelect(lp.processo);
+  pintarDocs();
+  modalAud().show();
+}
+function pintarModelosSelect(processo) {
+  const tipo = $('#ma-tipo').value;
+  const l = modelos.filter(m => (m.tipo || 'sistema') === tipo);
+  $('#ma-modelo').innerHTML = l.map(m => `<option value="${m.id}">${esc(m.nome)} (${(m.itens || []).length} itens)</option>`).join('') + '<option value="">— Em branco (só constatações livres) —</option>';
+  const achou = processo && l.find(m => (m.processo || '').toLowerCase() === processo.toLowerCase());
+  if (achou) $('#ma-modelo').value = achou.id;
+  preencherProcessoDoModelo();
+}
+let processoAuto = false;   // processo veio do modelo (não foi digitado) — acompanha a troca de modelo
+function preencherProcessoDoModelo() {
+  const m = modelos.find(x => x.id === $('#ma-modelo').value);
+  if (m && (!$('#ma-processo').value || processoAuto)) { $('#ma-processo').value = m.processo; processoAuto = true; }
+}
+$('#ma-processo').addEventListener('input', () => { processoAuto = false; });
+$('#ma-tipo').onchange = () => pintarModelosSelect($('#ma-processo').value);
+$('#ma-modelo').onchange = preencherProcessoDoModelo;
+function pintarDocs() {
+  const t = ($('#ma-doc-busca').value || '').toLowerCase();
+  const nomeDoc = (d) => `${d.codigo} – ${d.titulo}${d.revisao !== '' ? `, rev. ${d.revisao}` : ''}`;
+  const l = biblioteca.filter(d => !t || `${d.codigo} ${d.titulo}`.toLowerCase().includes(t));
+  const marcadosFora = [...docsMarcados].filter(n => !biblioteca.some(d => nomeDoc(d) === n));
+  $('#ma-doc-lista').innerHTML = (biblioteca.length ? '' : '<div class="small text-muted">Biblioteca de documentos indisponível — use o campo de texto abaixo.</div>') +
+    marcadosFora.map(n => `<label><input type="checkbox" checked data-doc="${esc(n)}"> ${esc(n)}</label>`).join('') +
+    l.map(d => { const n = nomeDoc(d); return `<label><input type="checkbox" ${docsMarcados.has(n) ? 'checked' : ''} data-doc="${esc(n)}"> ${esc(n)}</label>`; }).join('');
+}
+$('#ma-doc-busca').oninput = pintarDocs;
+$('#ma-doc-lista').onchange = (e) => {
+  const c = e.target.closest('[data-doc]'); if (!c) return;
+  c.checked ? docsMarcados.add(c.dataset.doc) : docsMarcados.delete(c.dataset.doc);
+};
+
+$('#ma-salvar').onclick = async () => {
+  const processo = $('#ma-processo').value.trim();
+  if (!processo) { alert('Informe o processo auditado.'); return; }
+  const livres = $('#ma-docs-livre').value.split(/\s*;\s*/).map(s => s.trim()).filter(Boolean);
+  const cab = {
+    processo, unidade: $('#ma-unidade').value, data: $('#ma-data').value || hojeISO(),
+    auditores: $('#ma-auditores').value.split(',').map(s => s.trim()).filter(Boolean),
+    responsavel: $('#ma-responsavel').value.trim(), normas: $('#ma-normas').value.trim(),
+    documentos: [...docsMarcados, ...livres],
+  };
+  const btn = $('#ma-salvar'); btn.disabled = true;
+  try {
+    if (novaCtx.editarId) {
+      Object.assign(atual, cab);
+      await salvarAtual(true);
+      modalAud().hide(); renderExec();
+      return;
+    }
+    const m = modelos.find(x => x.id === $('#ma-modelo').value);
+    const nova = {
+      ...cab, tipo: $('#ma-tipo').value, ano: Number(cab.data.slice(0, 4)),
+      modeloId: m?.id || '', modeloNome: m?.nome || '',
+      itens: (m?.itens || []).map(x => ({ id: uid(), secao: x.secao, isoItem: x.isoItem, pergunta: x.pergunta, docRef: x.docRef || '', resultado: '', evidencia: '', ram: '' })),
+      status: 'em_andamento', criadoPor: usuarioEmail, unidadeRegistrou: perfil.unidade || '',
+      criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(),
+      programaLinhaId: novaCtx.linhaPrograma?.id || '',
+    };
+    const id = 'AU-' + Date.now();
+    const contRef = doc(db, 'contadores', 'auditorias');
+    await runTransaction(db, async (tx) => {
+      const s = await tx.get(contRef);
+      const n = (s.exists() ? (s.data().ultimoNumero || 0) : 0) + 1;
+      nova.numero = `${String(n).padStart(3, '0')}/${String(nova.ano).slice(2)}`;
+      tx.set(contRef, { ultimoNumero: n });
+      tx.set(doc(db, 'auditorias', id), nova);
+    });
+    auditorias.unshift({ id, ...nova });
+    if (novaCtx.linhaPrograma && programa) {
+      const l = programa.linhas.find(x => x.id === novaCtx.linhaPrograma.id);
+      if (l) { l.auditoriaId = id; l.dataRealizada = nova.data; await salvarPrograma(true); }
+    }
+    modalAud().hide();
+    location.hash = 'auditoria/' + id;
+  } catch (e) { console.error(e); alert('Não foi possível criar a auditoria: ' + (e.message || e)); }
+  finally { btn.disabled = false; }
+};
+
+/* ================================================================ EXECUÇÃO */
+async function abrirAuditoria(id) {
+  $('#au-conteudo').innerHTML = '<div class="au-vazio">Abrindo auditoria...</div>';
+  try {
+    const s = await getDoc(doc(db, 'auditorias', id));
+    if (!s.exists()) { $('#au-conteudo').innerHTML = '<div class="au-vazio">Auditoria não encontrada.</div>'; return; }
+    atual = { id, ...s.data() };
+    const k = auditorias.findIndex(a => a.id === id); if (k >= 0) auditorias[k] = atual;
+    // rascunho local mais novo que o servidor (ex.: celular ficou sem sinal e a página foi fechada)
+    try {
+      const r = JSON.parse(localStorage.getItem('au-rascunho-' + id) || 'null');
+      if (r && r.atualizadoEm > (atual.atualizadoEm || '')) { atual.itens = r.itens; toast('Recuperei respostas que ainda não tinham ido pro servidor'); agendarSalvar(); }
+    } catch (e) { /* ignora */ }
+    fotosAtual = {};
+    const sf = await getDocs(collection(db, 'auditorias', id, 'fotos'));
+    sf.docs.forEach(d => { const f = { id: d.id, ...d.data() }; (fotosAtual[f.itemId] = fotosAtual[f.itemId] || []).push(f); });
+    Object.values(fotosAtual).forEach(l => l.sort((a, b) => (a.em || '').localeCompare(b.em || '')));
+    filtroExec = 'todos';
+    renderExec();
+  } catch (e) { console.error(e); $('#au-conteudo').innerHTML = '<div class="au-vazio">Erro ao abrir: ' + esc(e.message || e) + '</div>'; }
+}
+
+function podeEditar() { return atual && (atual.status !== 'concluida' || souQualidade); }
+
+function renderExec() {
+  const a = atual, c = contar(a.itens || []);
+  const pct = c.total ? Math.round(c.resp / c.total * 100) : 0;
+  const ed = podeEditar();
+  $('#au-conteudo').innerHTML = `
+    <div class="au-exec-topo">
+      <div class="d-flex justify-content-between gap-2 align-items-start">
+        <div>
+          <h2>${esc(a.numero)} · ${esc(a.processo)} ${a.unidade ? '· ' + esc(a.unidade) : ''}</h2>
+          <div class="meta">
+            <span><i class="bi bi-tag"></i> ${a.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'}</span>
+            <span><i class="bi bi-calendar"></i> ${fmtBR(a.data)}</span>
+            <span><i class="bi bi-person-badge"></i> ${esc((a.auditores || []).join(', ') || '—')}</span>
+            <span><i class="bi bi-person"></i> Auditado: ${esc(a.responsavel || '—')}</span>
+          </div>
+        </div>
+        <div class="d-flex gap-1">
+          ${ed ? '<button class="btn btn-sm btn-outline-secondary" id="ex-editar" title="Editar cabeçalho"><i class="bi bi-pencil"></i></button>' : ''}
+          <button class="btn btn-sm btn-outline-secondary" id="ex-voltar" title="Voltar"><i class="bi bi-arrow-left"></i></button>
+        </div>
+      </div>
+      ${(a.documentos || []).length ? `<div class="meta mt-1"><span><i class="bi bi-file-earmark-text"></i> ${esc(a.documentos.join('; '))}</span></div>` : ''}
+      <div class="au-progresso"><div style="width:${pct}%"></div></div>
+      <div class="d-flex justify-content-between flex-wrap gap-1">
+        <span class="small"><b>${c.resp}</b> de ${c.total} respondidos ·
+          <span class="text-success fw-bold">${c.C} C</span> · <span class="text-danger fw-bold">${c.NC} NC</span> · <span style="color:#9a6b00" class="fw-bold">${c.OM} OM</span> · ${c.NA} N/A</span>
+        <span class="au-salvo" id="ex-salvo">${a.status === 'concluida' ? '<span class="au-pill fim">concluída</span>' : 'Salvo'}</span>
+      </div>
+    </div>
+    <div class="au-filtros" id="ex-filtros">
+      ${[['todos', 'Todos'], ['pend', 'Pendentes'], ['NC', 'Não conformes'], ['OM', 'Melhorias'], ['fotos', 'Com fotos']].map(([k, r]) =>
+        `<button class="au-tab ${filtroExec === k ? 'active' : ''}" data-f="${k}">${r}</button>`).join('')}
+    </div>
+    <div id="ex-itens">${(a.itens || []).map((it, k) => cardItem(it, k)).join('') || '<div class="au-vazio">Checklist em branco — use "Nova constatação" para registrar o que observar.</div>'}</div>
+    <div class="au-rodape">
+      ${ed ? '<button class="btn btn-outline-primary" id="ex-add"><i class="bi bi-plus-circle"></i> Nova constatação</button>' : ''}
+      <button class="btn btn-outline-dark" id="ex-pdf"><i class="bi bi-file-earmark-pdf"></i> ${a.tipo === 'relampago' ? 'RG 71' : 'RG 12'} em PDF</button>
+      ${a.status !== 'concluida' ? '<button class="btn btn-success" id="ex-concluir"><i class="bi bi-check2-circle"></i> Concluir</button>'
+        : (souQualidade ? '<button class="btn btn-outline-secondary" id="ex-reabrir"><i class="bi bi-unlock"></i> Reabrir</button>' : '')}
+      ${souQualidade ? '<button class="btn btn-outline-danger" id="ex-excluir" title="Excluir auditoria"><i class="bi bi-trash"></i></button>' : ''}
+    </div>
+    <input type="file" id="ex-file" accept="image/*" capture="environment" multiple hidden>
+    <input type="file" id="ex-file-galeria" accept="image/*" multiple hidden>`;
+  aplicarFiltroExec();
+  ligarExec();
+}
+
+function cardItem(it, k) {
+  const ed = podeEditar();
+  const fotos = fotosAtual[it.id] || [];
+  const mostraExtra = it.resultado === 'NC' || it.resultado === 'OM';
+  return `<div class="au-item ${it.resultado ? 'r-' + it.resultado : ''}" data-item="${it.id}">
+    <div class="cab"><span>${k + 1}. ${esc(it.secao || 'Constatação')}</span>${it.isoItem ? `<span class="iso">ISO ${esc(it.isoItem)}</span>` : ''}${it.docRef ? `<span>${esc(it.docRef)}</span>` : ''}</div>
+    ${it.livre && ed ? `<textarea class="perg-livre mt-1 mb-2" data-campo="pergunta" placeholder="O que foi verificado?" style="min-height:44px;font-weight:600">${esc(it.pergunta)}</textarea>` : `<div class="perg">${esc(it.pergunta)}</div>`}
+    <div class="au-res">
+      ${Object.entries(RES).map(([r, v]) => `<button ${ed ? '' : 'disabled'} class="${it.resultado === r ? 'on-' + r : ''}" data-res="${r}"><i class="bi ${v.ico}"></i>${v.rot}</button>`).join('')}
+    </div>
+    <textarea data-campo="evidencia" ${ed ? '' : 'readonly'} placeholder="${it.resultado === 'NC' ? 'Descreva a não conformidade e a evidência (cliente, CT-e, local, conferente...)' : 'Evidência / o que foi verificado (documentos, registros, entrevistas)'}">${esc(it.evidencia || '')}</textarea>
+    ${mostraExtra ? `<div class="au-extra">
+      <input data-campo="isoItem" ${ed ? '' : 'readonly'} placeholder="Item ISO" value="${esc(it.isoItem || '')}">
+      <div class="d-flex gap-1"><input data-campo="ram" ${ed ? '' : 'readonly'} placeholder="RAM Nº (ação RG 34)" value="${esc(it.ram || '')}">
+        ${souQualidade && it.resultado === 'NC' && !it.ram ? `<button class="btn btn-sm btn-outline-danger text-nowrap" data-acao="1" title="Abrir ação corretiva no RG 34"><i class="bi bi-plus"></i> RG 34</button>` : ''}</div>
+    </div>` : ''}
+    <div class="au-fotos">
+      ${fotos.map(f => `<div class="au-foto ${f.enviando ? 'enviando' : ''}" data-foto="${f.id}"><img src="${f.dados}" alt="">${ed ? `<button class="x" data-del-foto="${f.id}">✕</button>` : ''}</div>`).join('')}
+      ${ed ? `<div class="au-add-foto" data-add-foto="1"><i class="bi bi-camera-fill"></i>Foto</div>
+              <div class="au-add-foto" data-add-galeria="1" style="width:56px"><i class="bi bi-images"></i></div>` : ''}
+      ${ed && it.livre ? `<button class="btn btn-sm btn-link text-danger ms-auto align-self-end" data-del-item="1">Remover</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function aplicarFiltroExec() {
+  document.querySelectorAll('#ex-itens .au-item').forEach(el => {
+    const it = atual.itens.find(x => x.id === el.dataset.item);
+    let ok = true;
+    if (filtroExec === 'pend') ok = !it.resultado;
+    else if (filtroExec === 'NC') ok = it.resultado === 'NC';
+    else if (filtroExec === 'OM') ok = it.resultado === 'OM';
+    else if (filtroExec === 'fotos') ok = (fotosAtual[it.id] || []).length > 0;
+    el.style.display = ok ? '' : 'none';
+  });
+}
+
+let itemFotoAlvo = null;
+function ligarExec() {
+  $('#ex-voltar').onclick = () => { location.hash = 'auditorias'; };
+  $('#ex-editar') && ($('#ex-editar').onclick = () => abrirModalNova({ editarId: atual.id }));
+  $('#ex-filtros').onclick = (e) => { const b = e.target.closest('[data-f]'); if (!b) return; filtroExec = b.dataset.f; document.querySelectorAll('#ex-filtros .au-tab').forEach(x => x.classList.toggle('active', x === b)); aplicarFiltroExec(); };
+  $('#ex-pdf').onclick = () => gerarRelatorio(atual);
+  $('#ex-concluir') && ($('#ex-concluir').onclick = abrirConcluir);
+  $('#ex-reabrir') && ($('#ex-reabrir').onclick = async () => { atual.status = 'em_andamento'; await salvarAtual(true); renderExec(); });
+  $('#ex-excluir') && ($('#ex-excluir').onclick = excluirAtual);
+  $('#ex-add') && ($('#ex-add').onclick = () => {
+    atual.itens.push({ id: uid(), livre: true, secao: 'Constatação', isoItem: '', pergunta: '', docRef: '', resultado: '', evidencia: '', ram: '' });
+    agendarSalvar(); renderExec();
+    const ult = document.querySelector('#ex-itens .au-item:last-child'); ult && ult.scrollIntoView({ behavior: 'smooth' });
+  });
+  const lista = $('#ex-itens');
+  lista.onclick = async (e) => {
+    const card = e.target.closest('[data-item]'); if (!card) return;
+    const it = atual.itens.find(x => x.id === card.dataset.item);
+    const bRes = e.target.closest('[data-res]');
+    if (bRes && podeEditar()) {
+      it.resultado = it.resultado === bRes.dataset.res ? '' : bRes.dataset.res;
+      agendarSalvar();
+      const k = atual.itens.indexOf(it);
+      card.outerHTML = cardItem(it, k);
+      atualizarTopo();
+      if (it.resultado === 'NC' || it.resultado === 'OM') setTimeout(() => document.querySelector(`[data-item="${it.id}"] textarea[data-campo="evidencia"]`)?.focus(), 50);
+      return;
+    }
+    if (e.target.closest('[data-add-foto]')) { itemFotoAlvo = it.id; $('#ex-file').click(); return; }
+    if (e.target.closest('[data-add-galeria]')) { itemFotoAlvo = it.id; $('#ex-file-galeria').click(); return; }
+    const del = e.target.closest('[data-del-foto]');
+    if (del) { e.stopPropagation(); if (confirm('Excluir esta foto?')) excluirFoto(it.id, del.dataset.delFoto); return; }
+    const ft = e.target.closest('[data-foto]');
+    if (ft) { const f = (fotosAtual[it.id] || []).find(x => x.id === ft.dataset.foto); if (f) { $('#au-visualizar-foto').innerHTML = `<img src="${f.dados}">`; bootstrap.Modal.getOrCreateInstance('#modal-foto').show(); } return; }
+    if (e.target.closest('[data-del-item]')) {
+      if (!confirm('Remover esta constatação?')) return;
+      (fotosAtual[it.id] || []).forEach(f => deleteDoc(doc(db, 'auditorias', atual.id, 'fotos', f.id)).catch(() => {}));
+      atual.itens = atual.itens.filter(x => x !== it); agendarSalvar(); renderExec(); return;
+    }
+    if (e.target.closest('[data-acao]')) { abrirAcaoRG34(it); return; }
+  };
+  lista.oninput = (e) => {
+    const campo = e.target.dataset.campo; if (!campo) return;
+    const it = atual.itens.find(x => x.id === e.target.closest('[data-item]').dataset.item);
+    it[campo] = e.target.value; agendarSalvar();
+  };
+  const aoEscolher = async (ev) => {
+    const files = [...ev.target.files]; ev.target.value = '';
+    for (const f of files) await adicionarFoto(itemFotoAlvo, f);
+  };
+  $('#ex-file').onchange = aoEscolher;
+  $('#ex-file-galeria').onchange = aoEscolher;
+}
+
+function atualizarTopo() {
+  const c = contar(atual.itens);
+  const pct = c.total ? Math.round(c.resp / c.total * 100) : 0;
+  const barra = document.querySelector('.au-progresso > div'); if (barra) barra.style.width = pct + '%';
+  const sp = document.querySelector('.au-exec-topo .small');
+  if (sp) sp.innerHTML = `<b>${c.resp}</b> de ${c.total} respondidos · <span class="text-success fw-bold">${c.C} C</span> · <span class="text-danger fw-bold">${c.NC} NC</span> · <span style="color:#9a6b00" class="fw-bold">${c.OM} OM</span> · ${c.NA} N/A`;
+}
+
+/* --------- gravação (agrupa edições; guarda rascunho no aparelho) --------- */
+let _tSalvar = null;
+function marcaSalvo(txt, erro) { const el = $('#ex-salvo'); if (el && atual.status !== 'concluida') { el.textContent = txt; el.classList.toggle('erro', !!erro); } }
+function agendarSalvar() {
+  atual.atualizadoEm = new Date().toISOString();
+  try { localStorage.setItem('au-rascunho-' + atual.id, JSON.stringify({ itens: atual.itens, atualizadoEm: atual.atualizadoEm })); } catch (e) { /* cheio */ }
+  marcaSalvo('Salvando...');
+  clearTimeout(_tSalvar); _tSalvar = setTimeout(() => salvarAtual(), 900);
+}
+async function salvarAtual(cabecalho) {
+  clearTimeout(_tSalvar); _tSalvar = null;
+  const a = atual; if (!a) return;
+  const dados = { itens: a.itens, atualizadoEm: a.atualizadoEm || new Date().toISOString(), status: a.status };
+  if (cabecalho) Object.assign(dados, {
+    processo: a.processo, unidade: a.unidade, data: a.data, ano: Number(String(a.data).slice(0, 4)), auditores: a.auditores,
+    responsavel: a.responsavel, normas: a.normas, documentos: a.documentos,
+    assinaturas: a.assinaturas || null, concluidaEm: a.concluidaEm || null,
+  });
+  try {
+    await updateDoc(doc(db, 'auditorias', a.id), dados);
+    localStorage.removeItem('au-rascunho-' + a.id);
+    marcaSalvo('Salvo ✓');
+    const k = auditorias.findIndex(x => x.id === a.id); if (k >= 0) auditorias[k] = a;
+  } catch (e) {
+    console.error(e);
+    marcaSalvo(navigator.onLine ? 'Erro ao salvar — tentando de novo' : 'Sem internet — guardado no aparelho', true);
+    clearTimeout(_tSalvar); _tSalvar = setTimeout(() => salvarAtual(cabecalho), 8000);
+  }
+}
+window.addEventListener('online', () => { if (atual && localStorage.getItem('au-rascunho-' + atual.id)) salvarAtual(); });
+window.addEventListener('pagehide', () => { if (_tSalvar && atual) salvarAtual(); });
+
+/* ------------------------------------------------------------- fotos */
+function comprimir(file, max = 1280, qualidade = 0.72) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width: w, height: h } = img;
+      const fator = Math.min(1, max / Math.max(w, h)); w = Math.round(w * fator); h = Math.round(h * fator);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      let q = qualidade, d = cv.toDataURL('image/jpeg', q);
+      while (d.length > 900000 && q > 0.35) { q -= 0.1; d = cv.toDataURL('image/jpeg', q); }   // limite de 1 MB por documento
+      res(d);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('imagem inválida')); };
+    img.src = url;
+  });
+}
+async function adicionarFoto(itemId, file) {
+  if (!itemId || !file) return;
+  const temp = { id: 'tmp' + uid(), itemId, dados: '', enviando: true };
+  try { temp.dados = await comprimir(file); } catch (e) { toast('Não consegui ler essa imagem', 'erro'); return; }
+  (fotosAtual[itemId] = fotosAtual[itemId] || []).push(temp);
+  redesenharItem(itemId);
+  const id = 'F' + Date.now() + uid().slice(0, 4);
+  try {
+    await setDoc(doc(db, 'auditorias', atual.id, 'fotos', id), { itemId, dados: temp.dados, em: new Date().toISOString(), por: usuarioEmail });
+    temp.id = id; temp.enviando = false;
+    const it = atual.itens.find(x => x.id === itemId); it.nFotos = (fotosAtual[itemId] || []).length; agendarSalvar();
+  } catch (e) {
+    console.error(e); toast('Foto não enviada (sem internet?) — tire de novo quando tiver sinal', 'erro');
+    fotosAtual[itemId] = fotosAtual[itemId].filter(f => f !== temp);
+  }
+  redesenharItem(itemId);
+}
+async function excluirFoto(itemId, fotoId) {
+  try { await deleteDoc(doc(db, 'auditorias', atual.id, 'fotos', fotoId)); } catch (e) { toast('Não foi possível excluir', 'erro'); return; }
+  fotosAtual[itemId] = (fotosAtual[itemId] || []).filter(f => f.id !== fotoId);
+  const it = atual.itens.find(x => x.id === itemId); it.nFotos = fotosAtual[itemId].length; agendarSalvar();
+  redesenharItem(itemId);
+}
+function redesenharItem(itemId) {
+  const el = document.querySelector(`[data-item="${itemId}"]`); if (!el) return;
+  const k = atual.itens.findIndex(x => x.id === itemId);
+  el.outerHTML = cardItem(atual.itens[k], k);
+}
+
+/* ------------------------------------------------- NC -> ação RG 34 */
+async function abrirAcaoRG34(it) {
+  if (!it.evidencia) { alert('Escreva primeiro a descrição/evidência da não conformidade.'); return; }
+  if (!confirm('Abrir uma ação corretiva (RG 34) com esta não conformidade?')) return;
+  const mapaProc = (p) => {
+    const s = (p || '').toLowerCase();
+    if (s.includes('opera') || s.includes('depós') || s.includes('torre')) return 'Operação';
+    if (s.includes('comerc')) return 'Comercial';
+    if (s.includes('finan') || s.includes('admin')) return 'Financeiro/Adm';
+    if (s === 'ti' || s.includes(' ti')) return 'TI';
+    if (s.includes('frota') || s.includes('compra')) return 'Gestão de Frota/Compras';
+    if (s.includes('rh') || s.includes('sesmt')) return 'RH';
+    return 'Qualidade';
+  };
+  const id = 'AC-' + Date.now();
+  const dados = {
+    id, processo: mapaProc(atual.processo), data_abertura: hojeISO(), status_acao: 'Aberto',
+    aberto_por: (atual.auditores || [])[0] || usuarioEmail, responsavel_geral: atual.responsavel || '', equipe_resolucao: '',
+    tipo_acao: 'Corretiva', origem_acao: 'Auditoria interna',
+    descricao_problema: `Auditoria ${atual.numero} (${atual.processo}${atual.unidade ? ' - ' + atual.unidade : ''}, ${fmtBR(atual.data)}) · ISO ${it.isoItem || '-'}: ${it.evidencia}`,
+    abrangencia: '', acao_imediata: '',
+    causas_ishikawa: { mao_obra: '', materiais: '', metodo: '', meio_ambiente: '', medida: '', maquinas: '' },
+    cinco_porques: { p1: '', p2: '', p3: '', p4: '', p5: '' }, plano_acao: [],
+    revisao_riscos: 'NÃO', mudanca_sgq: 'NÃO',
+    eficacia: { data_verificacao: '', acoes_implantadas: '', acoes_eficazes: '', obs_eficacia: '', verificado_por: '' },
+    atualizado_em: new Date().toISOString(), auditoriaId: atual.id,
+  };
+  try {
+    const contRef = doc(db, 'contadores', 'acoes');
+    let semente = 0;
+    const fora = await getDoc(contRef);
+    if (!fora.exists()) {
+      const s = await getDocs(collection(db, 'acoes_qualidade'));
+      s.forEach(d => { const n = parseInt(d.data().num_registro, 10); if (!isNaN(n) && n > semente) semente = n; });
+    }
+    let num = '';
+    await runTransaction(db, async (tx) => {
+      const c = await tx.get(contRef);
+      const n = (c.exists() ? (c.data().ultimoNumero || 0) : semente) + 1;
+      num = String(n).padStart(3, '0');
+      tx.set(contRef, { ultimoNumero: n });
+      tx.set(doc(db, 'acoes_qualidade', id), { ...dados, num_registro: num });
+    });
+    it.ram = num; agendarSalvar(); redesenharItem(it.id);
+    toast(`Ação RG 34 nº ${num} aberta`);
+  } catch (e) { console.error(e); alert('Não foi possível abrir a ação: ' + (e.message || e)); }
+}
+
+/* ------------------------------------------------------- concluir */
+const pads = {};
+function prepararAssinatura(id) {
+  const cv = document.getElementById(id);
+  const r = cv.getBoundingClientRect();
+  cv.width = Math.max(300, r.width) * 2; cv.height = 150 * 2;
+  const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#000050';
+  let des = false, usado = false;
+  const pos = (e) => { const b = cv.getBoundingClientRect(); const p = e.touches ? e.touches[0] : e; return [p.clientX - b.left, p.clientY - b.top]; };
+  const ini = (e) => { e.preventDefault(); des = true; usado = true; const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); };
+  const mov = (e) => { if (!des) return; e.preventDefault(); const [x, y] = pos(e); ctx.lineTo(x, y); ctx.stroke(); };
+  const fim = () => { des = false; };
+  cv.onpointerdown = ini; cv.onpointermove = mov; cv.onpointerup = fim; cv.onpointerleave = fim;
+  pads[id] = { cv, usado: () => usado, limpar: () => { ctx.clearRect(0, 0, cv.width, cv.height); usado = false; } };
+}
+document.querySelectorAll('[data-limpar]').forEach(b => b.onclick = () => pads[b.dataset.limpar]?.limpar());
+function abrirConcluir() {
+  const c = contar(atual.itens);
+  $('#mc-resumo').innerHTML = `<div class="d-flex gap-2 flex-wrap"><span class="au-pill c">${c.C} conformes</span><span class="au-pill nc">${c.NC} NC</span><span class="au-pill om">${c.OM} melhorias</span><span class="au-pill na">${c.NA} N/A</span></div>
+    ${c.total - c.resp ? `<div class="alert alert-warning py-2 mt-2 mb-0 small">${c.total - c.resp} pergunta(s) sem resposta — vão sair como "não verificado" no relatório.</div>` : ''}
+    ${atual.itens.some(i => (i.resultado === 'NC' || i.resultado === 'OM') && !i.evidencia) ? '<div class="alert alert-danger py-2 mt-2 mb-0 small">Há NC/melhoria sem descrição da evidência.</div>' : ''}`;
+  $('#mc-nome-auditor').textContent = (atual.auditores || []).join(', ');
+  $('#mc-nome-auditado').textContent = atual.responsavel || '';
+  const m = bootstrap.Modal.getOrCreateInstance('#modal-concluir');
+  document.getElementById('modal-concluir').addEventListener('shown.bs.modal', () => { prepararAssinatura('mc-ass-auditor'); prepararAssinatura('mc-ass-auditado'); }, { once: true });
+  m.show();
+}
+$('#mc-confirmar').onclick = async () => {
+  const ass = {};
+  ['auditor', 'auditado'].forEach(k => { const p = pads['mc-ass-' + k]; if (p && p.usado()) ass[k] = p.cv.toDataURL('image/png'); });
+  atual.assinaturas = Object.keys(ass).length ? ass : (atual.assinaturas || null);
+  atual.status = 'concluida'; atual.concluidaEm = new Date().toISOString();
+  await salvarAtual(true);
+  if (atual.programaLinhaId) await marcarRealizadaNoPrograma(atual);
+  bootstrap.Modal.getOrCreateInstance('#modal-concluir').hide();
+  renderExec();
+  gerarRelatorio(atual);
+};
+async function marcarRealizadaNoPrograma(a) {
+  try {
+    const ref = doc(db, 'auditoria_programa', String(a.ano || String(a.data).slice(0, 4)));
+    const s = await getDoc(ref); if (!s.exists()) return;
+    const linhas = s.data().linhas || [];
+    const l = linhas.find(x => x.id === a.programaLinhaId); if (!l) return;
+    l.dataRealizada = a.data; l.auditoriaId = a.id;
+    await updateDoc(ref, { linhas });
+  } catch (e) { /* só qualidade grava o programa — sem problema */ }
+}
+async function excluirAtual() {
+  if (!confirm(`Excluir a auditoria ${atual.numero} e todas as fotos? Não dá para desfazer.`)) return;
+  try {
+    const sf = await getDocs(collection(db, 'auditorias', atual.id, 'fotos'));
+    const b = writeBatch(db); sf.docs.forEach(d => b.delete(d.ref)); b.delete(doc(db, 'auditorias', atual.id)); await b.commit();
+    auditorias = auditorias.filter(a => a.id !== atual.id); localStorage.removeItem('au-rascunho-' + atual.id);
+    location.hash = 'auditorias';
+  } catch (e) { alert('Erro ao excluir: ' + (e.message || e)); }
+}
+
+/* ============================================================ PDF (comum) */
+function cabecalhoPDF(titulo) {
+  return `<div class="cab"><div class="logo"><img src="${LOGO_URL}"></div><div class="tit">${esc(titulo)}</div>
+    <table><tr><th>Elaboração:</th><td>${esc(isoCfg.elaboracao || '')}</td></tr><tr><th>Revisão:</th><td>${esc(isoCfg.revisao || '')}</td></tr><tr><th>N° revisão:</th><td>${esc(isoCfg.numRevisao || '')}</td></tr></table></div>`;
+}
+async function gerarPDF(html, nomeArquivo, { paisagem = false } = {}) {
+  if (!window.jspdf || !window.html2canvas) { alert('Gerador de PDF não carregou — verifique a internet.'); return; }
+  toast('Gerando PDF...');
+  const larg = paisagem ? 1080 : 760;
+  const box = document.createElement('div'); box.className = 'au-pdf'; box.style.width = larg + 'px'; box.innerHTML = html;
+  document.body.appendChild(box);
+  try {
+    await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]);
+    await Promise.all([...box.querySelectorAll('img')].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: paisagem ? 'landscape' : 'portrait' });
+    const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
+    const mL = 36, mT = 30, mB = 44, fimUtil = H - mB, util = fimUtil - mT;
+    const largC = W - mL * 2, ptCss = largC / larg;
+    // Cada bloco (cabeçalho, tabela, par de fotos...) vira uma imagem separada:
+    // assim o celular não estoura o tamanho máximo de "canvas" em relatórios grandes.
+    const escala = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 1.6 : 2;
+    let y = mT;
+    for (const bloco of [...box.children]) {
+      const est = getComputedStyle(bloco);
+      const mt = parseFloat(est.marginTop) * ptCss, mb = parseFloat(est.marginBottom) * ptCss;
+      const cv = await html2canvas(bloco, { scale: escala, useCORS: true, backgroundColor: '#fff', windowWidth: larg });
+      const ptPx = (bloco.offsetWidth * ptCss) / cv.width;
+      const larguraPt = bloco.offsetWidth * ptCss;
+      let altTotal = cv.height * ptPx;
+      y += mt;
+      if (altTotal <= fimUtil - y) {                      // cabe no resto da página
+        pdf.addImage(cv.toDataURL('image/jpeg', 0.9), 'JPEG', mL, y, larguraPt, altTotal, undefined, 'FAST');
+        y += altTotal + mb; continue;
+      }
+      if (altTotal <= util * 0.9 || y - mT > util * 0.75) {  // não cabe: vai inteiro pra próxima página
+        pdf.addPage(); y = mT;
+        if (altTotal <= util) { pdf.addImage(cv.toDataURL('image/jpeg', 0.9), 'JPEG', mL, y, larguraPt, altTotal, undefined, 'FAST'); y += altTotal + mb; continue; }
+      }
+      // bloco maior que uma página: fatia procurando uma linha em branco (não corta texto ao meio)
+      const ctx = cv.getContext('2d'), passo = Math.max(1, Math.floor(cv.width / 48));
+      const branca = (top, alt) => {
+        if (alt <= 0) return -1;
+        const d = ctx.getImageData(0, top, cv.width, alt).data;
+        for (let l = alt - 1; l >= 0; l--) {
+          let ok = true; const o = l * cv.width * 4;
+          for (let x = 0; x < cv.width; x += passo) { const k = o + x * 4; if (d[k] < 245 || d[k + 1] < 245 || d[k + 2] < 245) { ok = false; break; } }
+          if (ok) return top + l;
+        }
+        return -1;
+      };
+      let cur = 0;
+      while (cur < cv.height) {
+        const dispPx = Math.floor((fimUtil - y) / ptPx);
+        const ideal = Math.min(cur + dispPx, cv.height); let fim = ideal;
+        if (ideal < cv.height) { const t = cur + Math.floor(dispPx * 0.5); const b = branca(t, ideal - t); if (b >= 0) fim = b; }
+        const alt = fim - cur;
+        if (alt <= 0) { pdf.addPage(); y = mT; continue; }
+        const f = document.createElement('canvas'); f.width = cv.width; f.height = alt;
+        f.getContext('2d').drawImage(cv, 0, cur, cv.width, alt, 0, 0, cv.width, alt);
+        pdf.addImage(f.toDataURL('image/jpeg', 0.9), 'JPEG', mL, y, larguraPt, alt * ptPx, undefined, 'FAST');
+        cur = fim; y += alt * ptPx;
+        if (cur < cv.height) { pdf.addPage(); y = mT; }
+      }
+      y += mb;
+    }
+    const n = pdf.internal.getNumberOfPages();
+    for (let p = 1; p <= n; p++) {
+      pdf.setPage(p); pdf.setDrawColor(210); pdf.line(mL, H - mB + 10, W - mL, H - mB + 10);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(120);
+      pdf.text('MirindoSul Transportes - Portal da Qualidade', mL, H - 20);
+      pdf.text(`Página ${p} de ${n}`, W - mL, H - 20, { align: 'right' }); pdf.setTextColor(0);
+    }
+    pdf.save(nomeArquivo.replace(/[\\/:*?"<>|]+/g, '-'));
+  } catch (e) { console.error(e); alert('Não foi possível gerar o PDF: ' + (e.message || e)); }
+  finally { box.remove(); }
+}
+
+/* ------------------------------------------ RG 12 / RG 71 (uma auditoria) */
+const pares = (l) => { const r = []; for (let k = 0; k < l.length; k += 2) r.push(l.slice(k, k + 2)); return r; };
+async function gerarRelatorio(a) {
+  if (!fotosAtual || atual?.id !== a.id) {
+    fotosAtual = {}; const sf = await getDocs(collection(db, 'auditorias', a.id, 'fotos'));
+    sf.docs.forEach(d => { const f = { id: d.id, ...d.data() }; (fotosAtual[f.itemId] = fotosAtual[f.itemId] || []).push(f); });
+  }
+  const rel = a.tipo === 'relampago';
+  const titulo = rel ? 'RG 71 – Auditorias relâmpagos' : 'RG 12 – Relatório de auditoria interna';
+  const itens = a.itens || [];
+  const nc = itens.filter(i => i.resultado === 'NC'), om = itens.filter(i => i.resultado === 'OM');
+  const fotos = []; let nFoto = 0;
+  const refFotos = (it) => (fotosAtual[it.id] || []).map(f => { nFoto++; fotos.push({ n: nFoto, f, it }); return 'Foto ' + nFoto; }).join(', ');
+  const linhasVer = itens.map((it, k) => {
+    const r = it.resultado ? RES[it.resultado].rot : 'Não verificado';
+    const rf = refFotos(it);
+    return `<tr><td>${esc(it.isoItem || '')}</td><td>${esc(it.pergunta)}${it.docRef ? ` <i style="color:#555">(${esc(it.docRef)})</i>` : ''}${it.evidencia ? `<div style="margin-top:3px;color:#222"><b>Evidência:</b> ${esc(it.evidencia)}</div>` : ''}${rf ? `<div style="color:#555;font-size:10.5px">${rf}</div>` : ''}</td>
+      <td class="res ${it.resultado || ''}" style="width:86px">${r}</td></tr>`;
+  }).join('');
+  const tabCons = (lista, rot) => `<div style="margin-top:12px">
+    <div class="secao" style="margin-top:0">${rot} — Total: ${String(lista.length).padStart(2, '0')}</div>
+    <table class="t" style="margin-bottom:0"><tr><th style="width:60px">RAM N°</th><th style="width:60px">Item ISO</th><th>Descrição e evidência</th></tr>
+    ${lista.length ? lista.map(i => `<tr><td>${esc(i.ram || '-')}</td><td>${esc(i.isoItem || '')}</td><td>${esc(i.evidencia || i.pergunta)}</td></tr>`).join('') : '<tr><td>-</td><td>-</td><td>-</td></tr>'}</table></div>`;
+  const html = `${cabecalhoPDF(titulo)}
+    <table class="t">
+      <tr><td style="width:50%"><b>Processo:</b> ${esc(a.processo)}${a.unidade ? ' – ' + esc(a.unidade) : ''}</td><td><b>Data da auditoria:</b> ${fmtBR(a.data)} &nbsp; <b>Nº:</b> ${esc(a.numero)}</td></tr>
+      <tr><td><b>Responsável pelo processo:</b> ${esc(a.responsavel || '')}</td><td><b>Auditor(es):</b> ${esc((a.auditores || []).join(', '))}</td></tr>
+      <tr><td colspan="2"><b>Documentos auditados:</b> ${esc((a.documentos || []).join('; ') || '-')}</td></tr>
+      <tr><td colspan="2"><b>Normas de referência:</b> ${esc(a.normas || 'ISO 9001:2015')}</td></tr>
+    </table>
+    <div><div class="secao" style="margin-top:0">${rel ? 'Evidências observadas' : 'Documentos e evidências verificadas'}</div>
+    <table class="t" style="margin-bottom:0"><tr><th style="width:62px">Item ISO</th><th>Verificação</th><th>Resultado</th></tr>${linhasVer || '<tr><td colspan="3">-</td></tr>'}</table></div>
+    ${tabCons(nc, 'Não conformidades identificadas')}
+    ${tabCons(om, 'Sugestões de melhoria / observações')}
+    ${fotos.length ? `${pares(fotos).map((par, k) => `<div>${k === 0 ? '<div class="secao" style="margin-top:4px">Registro fotográfico</div>' : ''}<div class="fotos">${par.map(x => `<figure><img src="${x.f.dados}"><figcaption><b>Foto ${x.n}</b> – ${esc(x.it.isoItem ? 'ISO ' + x.it.isoItem + ' · ' : '')}${esc((x.it.evidencia || x.it.pergunta || '').slice(0, 140))}</figcaption></figure>`).join('')}</div></div>`).join('')}` : ''}
+    <div class="ass">
+      <div>${a.assinaturas?.auditor ? `<img src="${a.assinaturas.auditor}">` : '<div style="height:70px"></div>'}<div class="linha">${esc((a.auditores || []).join(', '))}<br>Auditor</div></div>
+      <div>${a.assinaturas?.auditado ? `<img src="${a.assinaturas.auditado}">` : '<div style="height:70px"></div>'}<div class="linha">${esc(a.responsavel || '')}<br>Auditado</div></div>
+    </div>`;
+  await gerarPDF(html, `${rel ? 'RG 71' : 'RG 12'} - ${a.processo}${a.unidade ? ' ' + a.unidade : ''} - ${a.data}.pdf`);
+}
+
+/* ============================================================ PROGRAMA RG 11 */
+async function carregarPrograma(ano) {
+  const s = await getDoc(doc(db, 'auditoria_programa', String(ano)));
+  programa = s.exists() ? s.data() : { ano, elaborado: '', revisado: '', responsavel: '', normas: 'ISO 9001:2015', obs: '', linhas: [] };
+  programa.linhas = programa.linhas || [];
+}
+async function salvarPrograma(silencioso) {
+  try { await setDoc(doc(db, 'auditoria_programa', String(anoPrograma)), programa); if (!silencioso) toast('Programa salvo'); }
+  catch (e) { if (!silencioso) alert('Não foi possível salvar o programa: ' + (e.message || e)); }
+}
+async function renderPrograma() {
+  $('#au-conteudo').innerHTML = '<div class="au-vazio">Carregando programa...</div>';
+  try { await carregarPrograma(anoPrograma); } catch (e) { $('#au-conteudo').innerHTML = '<div class="au-vazio">Sem acesso ao programa.</div>'; return; }
+  const ed = souQualidade;
+  const dis = ed ? '' : 'disabled';
+  const linhas = programa.linhas;
+  $('#au-conteudo').innerHTML = `
+    <div class="qc-card">
+      <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+        <div><label class="form-label small mb-0">Ano</label>
+          <div class="input-group input-group-sm" style="width:140px"><button class="btn btn-outline-secondary" id="pg-ant">‹</button><input class="form-control text-center" value="${anoPrograma}" readonly><button class="btn btn-outline-secondary" id="pg-prox">›</button></div></div>
+        <div><label class="form-label small mb-0">Elaborado em</label><input type="date" class="form-control form-control-sm" id="pg-elab" value="${esc(programa.elaborado)}" ${dis}></div>
+        <div><label class="form-label small mb-0">Revisado em</label><input type="date" class="form-control form-control-sm" id="pg-rev" value="${esc(programa.revisado)}" ${dis}></div>
+        <div><label class="form-label small mb-0">Responsável</label><input class="form-control form-control-sm" id="pg-resp" value="${esc(programa.responsavel)}" ${dis} list="dl-pessoas"></div>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+          ${ed && !linhas.length ? '<button class="btn btn-sm btn-outline-primary" id="pg-gerar"><i class="bi bi-magic"></i> Montar com todos os processos (2x no ano)</button><button class="btn btn-sm btn-outline-secondary" id="pg-copiar">Copiar do ano anterior</button>' : ''}
+          <button class="btn btn-sm btn-outline-dark" id="pg-pdf"><i class="bi bi-file-earmark-pdf"></i> RG 11 em PDF</button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered au-tabela">
+          <thead><tr><th>Processo</th><th>Unidade</th><th>Documentos</th><th>Auditor(a)</th><th>Responsável</th><th>Mês</th><th>Data prevista</th><th>Realizada</th><th></th></tr></thead>
+          <tbody id="pg-corpo">
+            ${linhas.map(l => `<tr data-l="${l.id}">
+              <td><input class="form-control form-control-sm" data-c="processo" value="${esc(l.processo)}" list="dl-processos" ${dis}></td>
+              <td><select class="form-select form-select-sm" data-c="unidade" ${dis}>${UNIDADES.map(u => `<option ${l.unidade === u ? 'selected' : ''}>${u}</option>`).join('')}</select></td>
+              <td><input class="form-control form-control-sm" data-c="documentos" value="${esc(l.documentos || '')}" ${dis} placeholder="PG 08, IT 02..."></td>
+              <td><input class="form-control form-control-sm" data-c="auditor" value="${esc(l.auditor || '')}" list="dl-pessoas" ${dis}></td>
+              <td><input class="form-control form-control-sm" data-c="responsavel" value="${esc(l.responsavel || '')}" list="dl-pessoas" ${dis}></td>
+              <td><select class="form-select form-select-sm" data-c="mes" ${dis}>${MESES.map((m, k) => `<option value="${k + 1}" ${Number(l.mes) === k + 1 ? 'selected' : ''}>${m}</option>`).join('')}</select></td>
+              <td><input type="date" class="form-control form-control-sm" data-c="dataPrevista" value="${esc(l.dataPrevista || '')}" ${dis}></td>
+              <td class="text-nowrap">${l.auditoriaId ? `<a href="#auditoria/${l.auditoriaId}">${fmtBR(l.dataRealizada) || 'abrir'}</a>` : (Number(l.mes) < new Date().getMonth() + 1 && anoPrograma <= new Date().getFullYear() ? '<span class="au-pill nc">atrasada</span>' : '—')}</td>
+              <td class="text-nowrap">${!l.auditoriaId ? `<button class="btn btn-sm btn-primary" data-iniciar="${l.id}" title="Iniciar esta auditoria"><i class="bi bi-play-fill"></i></button>` : ''}
+                ${ed ? `<button class="btn btn-sm btn-outline-danger" data-del="${l.id}"><i class="bi bi-x"></i></button>` : ''}</td>
+            </tr>`).join('') || '<tr><td colspan="9" class="au-vazio">Nenhuma auditoria programada para este ano.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      ${ed ? '<button class="btn btn-sm btn-outline-primary" id="pg-add"><i class="bi bi-plus"></i> Adicionar linha</button>' : ''}
+      <div class="mt-3"><label class="form-label small mb-0">Observações</label><textarea class="form-control form-control-sm" id="pg-obs" rows="2" ${dis}>${esc(programa.obs || '')}</textarea></div>
+      ${ed ? '<div class="text-end mt-2"><button class="btn btn-primary btn-sm" id="pg-salvar"><i class="bi bi-save"></i> Salvar programa</button></div>' : ''}
+    </div>`;
+  $('#pg-ant').onclick = () => { anoPrograma--; renderPrograma(); };
+  $('#pg-prox').onclick = () => { anoPrograma++; renderPrograma(); };
+  $('#pg-pdf').onclick = pdfPrograma;
+  $('#pg-corpo').onclick = (e) => {
+    const ini = e.target.closest('[data-iniciar]');
+    if (ini) { const l = programa.linhas.find(x => x.id === ini.dataset.iniciar); abrirModalNova({ linhaPrograma: l }); return; }
+    const del = e.target.closest('[data-del]');
+    if (del && confirm('Remover esta linha do programa?')) { programa.linhas = programa.linhas.filter(x => x.id !== del.dataset.del); salvarPrograma(true).then(renderPrograma); }
+  };
+  if (!ed) return;
+  $('#pg-corpo').oninput = $('#pg-corpo').onchange = (e) => {
+    const c = e.target.dataset.c; if (!c) return;
+    const l = programa.linhas.find(x => x.id === e.target.closest('[data-l]').dataset.l);
+    l[c] = c === 'mes' ? Number(e.target.value) : e.target.value;
+  };
+  ['elab:elaborado', 'rev:revisado', 'resp:responsavel', 'obs:obs'].forEach(p => { const [i, c] = p.split(':'); $('#pg-' + i).oninput = (e) => { programa[c] = e.target.value; }; });
+  $('#pg-add').onclick = () => { programa.linhas.push({ id: uid(), processo: '', unidade: 'MTZ', documentos: '', auditor: '', responsavel: '', mes: new Date().getMonth() + 1, dataPrevista: '' }); renderPrograma2(); };
+  $('#pg-salvar').onclick = () => salvarPrograma();
+  $('#pg-gerar') && ($('#pg-gerar').onclick = () => {
+    const base = [
+      ['Direção', 'MTZ', 'Manual da Qualidade'], ['Qualidade', 'MTZ', 'PG 01, PG 02, PG 03, PG 04'], ['Comercial', 'MTZ', 'PG 06, IT 01'],
+      ['Operação', 'RSL', 'PG 08, IT 02 a IT 06, IT 16'], ['Operação', 'GRU', 'PG 08, IT 02 a IT 06, IT 16'], ['Operação', 'ITJ', 'PG 08, IT 02 a IT 06, IT 16'],
+      ['Operação', 'CTB', 'PG 08, IT 02 a IT 06, IT 16'], ['Operação', 'POA', 'PG 08, IT 02 a IT 06, IT 16'], ['Operação', 'CMP', 'PG 08, IT 02 a IT 06, IT 16'],
+      ['RH', 'MTZ', 'PG 05'], ['Compras', 'MTZ', 'PG 07'], ['Gestão de frota', 'MTZ', 'PG 12, IT 17, IT 18'],
+      ['Administrativo/financeiro', 'MTZ', 'PG 13, IT 08 a IT 11'], ['TI', 'MTZ', 'PG 14'], ['Torre de controle', 'MTZ', 'PG 11'],
+    ];
+    programa.linhas = [];
+    [6, 11].forEach(mes => base.forEach(([p, u, d]) => programa.linhas.push({ id: uid(), processo: p, unidade: u, documentos: d, auditor: '', responsavel: '', mes, dataPrevista: '' })));
+    renderPrograma2();
+  });
+  $('#pg-copiar') && ($('#pg-copiar').onclick = async () => {
+    const s = await getDoc(doc(db, 'auditoria_programa', String(anoPrograma - 1)));
+    if (!s.exists()) { alert('Não há programa de ' + (anoPrograma - 1)); return; }
+    programa.linhas = (s.data().linhas || []).map(l => ({ ...l, id: uid(), auditoriaId: '', dataRealizada: '', dataPrevista: '' }));
+    renderPrograma2();
+  });
+}
+async function renderPrograma2() { await salvarPrograma(true); renderPrograma(); }
+
+function pdfPrograma() {
+  const l = programa.linhas.slice().sort((a, b) => a.processo.localeCompare(b.processo) || a.unidade.localeCompare(b.unidade));
+  // agrupa processo+unidade numa linha só, marcando os meses
+  const grupos = {};
+  l.forEach(x => { const k = x.processo + '|' + x.unidade; (grupos[k] = grupos[k] || { ...x, meses: {} }).meses[x.mes] = x.auditoriaId ? '✔' : 'X'; });
+  const html = `${cabecalhoPDF('RG 11 – Programa anual de auditorias do SGI')}
+    <table class="t"><tr><td><b>Ano:</b> ${anoPrograma}</td><td><b>Norma(s) de referência:</b> ${esc(programa.normas || 'ISO 9001:2015')}</td>
+      <td><b>Elaborado em:</b> ${fmtBR(programa.elaborado)}</td><td><b>Revisado em:</b> ${fmtBR(programa.revisado)}</td><td><b>Responsável:</b> ${esc(programa.responsavel || '')}</td></tr></table>
+    <div><div class="secao" style="margin-top:0">Processos envolvidos</div>
+    <table class="t" style="margin-bottom:0"><tr><th>Processo</th>${MESES.map(m => `<th class="mes">${m}</th>`).join('')}</tr>
+      ${Object.values(grupos).map(g => `<tr><td>${esc(g.processo)} (${esc(g.unidade)})</td>${MESES.map((m, k) => `<td class="mes">${g.meses[k + 1] || ''}</td>`).join('')}</tr>`).join('')}</table></div>
+    <div style="margin-top:12px"><div class="secao" style="margin-top:0">Detalhamento</div>
+    <table class="t" style="margin-bottom:0"><tr><th>Processo</th><th>Documentos</th><th>Auditor(a)</th><th>Responsável pelo processo</th><th>Data prevista</th><th>Data realizada</th></tr>
+      ${l.map(x => `<tr><td>${esc(x.processo)} (${esc(x.unidade)})</td><td>${esc(x.documentos || '')}</td><td>${esc(x.auditor || '')}</td><td>${esc(x.responsavel || '')}</td><td>${x.dataPrevista ? fmtBR(x.dataPrevista) : MESES[(x.mes || 1) - 1]}</td><td>${fmtBR(x.dataRealizada)}</td></tr>`).join('')}</table></div>
+    ${programa.obs ? `<p><b>Obs.:</b> ${esc(programa.obs)}</p>` : ''}`;
+  gerarPDF(html, `RG 11 - Programa anual de auditorias ${anoPrograma}.pdf`, { paisagem: true });
+}
+
+/* ========================================================= ENCERRAMENTO RG 13 */
+async function renderEncerramento() {
+  $('#au-conteudo').innerHTML = '<div class="au-vazio">Carregando...</div>';
+  try {
+    const s = await getDoc(doc(db, 'auditoria_encerramentos', String(anoEnc)));
+    encerramento = s.exists() ? s.data() : null;
+  } catch (e) { encerramento = null; }
+  const doAno = auditorias.filter(a => String(a.data || '').startsWith(String(anoEnc)) && a.status === 'concluida' && a.tipo !== 'relampago');
+  if (!encerramento) encerramento = {
+    ano: anoEnc, data: hojeISO(), local: 'Rio do Sul',
+    objetivo: 'Avaliar adequação e conformidade do sistema de gestão da qualidade com relação aos requisitos da norma ISO 9001:2015.\nAnalisar possíveis pendências do sistema de gestão da qualidade.',
+    pontosFortes: '', aprimorar: '', participantes: '', auditoriaIds: doAno.map(a => a.id), situacao: {},
+  };
+  encerramento.situacao = encerramento.situacao || {};
+  const ed = souQualidade, dis = ed ? '' : 'disabled';
+  const sel = new Set(encerramento.auditoriaIds || []);
+  $('#au-conteudo').innerHTML = `
+    <div class="qc-card">
+      <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+        <div><label class="form-label small mb-0">Ano</label>
+          <div class="input-group input-group-sm" style="width:140px"><button class="btn btn-outline-secondary" id="en-ant">‹</button><input class="form-control text-center" value="${anoEnc}" readonly><button class="btn btn-outline-secondary" id="en-prox">›</button></div></div>
+        <div><label class="form-label small mb-0">Data da reunião</label><input type="date" class="form-control form-control-sm" id="en-data" value="${esc(encerramento.data)}" ${dis}></div>
+        <div><label class="form-label small mb-0">Local</label><input class="form-control form-control-sm" id="en-local" value="${esc(encerramento.local || '')}" ${dis}></div>
+        <div class="ms-auto d-flex gap-2">
+          ${ed ? '<button class="btn btn-sm btn-primary" id="en-salvar"><i class="bi bi-save"></i> Salvar</button>' : ''}
+          <button class="btn btn-sm btn-outline-dark" id="en-pdf"><i class="bi bi-file-earmark-pdf"></i> RG 13 em PDF</button>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label small mb-0">Objetivo desta auditoria</label><textarea class="form-control form-control-sm" rows="3" id="en-objetivo" ${dis}>${esc(encerramento.objetivo)}</textarea></div>
+        <div class="col-md-6"><label class="form-label small mb-0">Participantes</label><textarea class="form-control form-control-sm" rows="3" id="en-participantes" ${dis}>${esc(encerramento.participantes)}</textarea></div>
+        <div class="col-md-6"><label class="form-label small mb-0">Pontos fortes identificados</label><textarea class="form-control form-control-sm" rows="3" id="en-fortes" ${dis}>${esc(encerramento.pontosFortes)}</textarea></div>
+        <div class="col-md-6"><label class="form-label small mb-0">Pontos que podem ser aprimorados</label><textarea class="form-control form-control-sm" rows="3" id="en-aprimorar" ${dis}>${esc(encerramento.aprimorar)}</textarea></div>
+      </div>
+      <div class="qc-section-title">Auditorias incluídas neste encerramento</div>
+      <div class="d-flex flex-wrap gap-2" id="en-auds">
+        ${auditorias.filter(a => String(a.data || '').startsWith(String(anoEnc)) && a.tipo !== 'relampago').map(a => `<label class="border rounded px-2 py-1 small"><input type="checkbox" data-aud="${a.id}" ${sel.has(a.id) ? 'checked' : ''} ${dis}> ${esc(a.numero)} · ${esc(a.processo)} ${esc(a.unidade || '')} ${a.status !== 'concluida' ? '<span class="text-warning">(em andamento)</span>' : ''}</label>`).join('') || '<span class="small text-muted">Nenhuma auditoria de sistema neste ano.</span>'}
+      </div>
+      <div id="en-tabelas" class="mt-3"></div>
+    </div>`;
+  const pintarTab = () => {
+    const ids = new Set(encerramento.auditoriaIds);
+    const auds = auditorias.filter(a => ids.has(a.id));
+    const cons = [];
+    auds.forEach(a => (a.itens || []).forEach(i => { if (i.resultado === 'NC' || i.resultado === 'OM') cons.push({ a, i, k: a.id + ':' + i.id }); }));
+    const porUni = {};
+    cons.forEach(c => { const u = c.a.unidade || '—'; porUni[u] = porUni[u] || { NC: 0, OM: 0 }; porUni[u][c.i.resultado]++; });
+    const tab = (tipo, rot) => {
+      const l = cons.filter(c => c.i.resultado === tipo);
+      return `<h6 class="mt-3 fw-bold" style="color:var(--qc-primary)">${rot} (${l.length})</h6>
+      <div class="table-responsive"><table class="table table-sm table-bordered au-tabela"><thead><tr><th>Item ISO</th><th>Descrição</th><th>Processo</th><th>RAM</th><th>Situação</th></tr></thead><tbody>
+      ${l.map(c => `<tr><td>${esc(c.i.isoItem || '')}</td><td style="white-space:normal;min-width:260px">${esc(c.i.evidencia || c.i.pergunta)}</td><td>${esc(c.a.processo)} ${esc(c.a.unidade || '')}</td><td>${esc(c.i.ram || '-')}</td>
+        <td><select class="form-select form-select-sm" data-sit="${c.k}" ${dis}>${['Pendente', 'OK', '-'].map(s => `<option ${(encerramento.situacao[c.k] || 'Pendente') === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td></tr>`).join('') || '<tr><td colspan="5" class="text-muted">Nenhuma.</td></tr>'}
+      </tbody></table></div>`;
+    };
+    $('#en-tabelas').innerHTML = `<div class="d-flex gap-2 flex-wrap mb-2">${Object.entries(porUni).map(([u, v]) => `<span class="au-pill st">${esc(u)}: ${v.NC} NC · ${v.OM} OM</span>`).join('')}</div>`
+      + tab('NC', 'Não conformidades identificadas') + tab('OM', 'Sugestões de melhoria / observações');
+  };
+  pintarTab();
+  $('#en-ant').onclick = () => { anoEnc--; renderEncerramento(); };
+  $('#en-prox').onclick = () => { anoEnc++; renderEncerramento(); };
+  $('#en-pdf').onclick = pdfEncerramento;
+  if (!ed) return;
+  $('#en-auds').onchange = (e) => {
+    const c = e.target.closest('[data-aud]'); if (!c) return;
+    const s = new Set(encerramento.auditoriaIds); c.checked ? s.add(c.dataset.aud) : s.delete(c.dataset.aud);
+    encerramento.auditoriaIds = [...s]; pintarTab();
+  };
+  $('#en-tabelas').onchange = (e) => { const s = e.target.closest('[data-sit]'); if (s) encerramento.situacao[s.dataset.sit] = s.value; };
+  [['data', 'data'], ['local', 'local'], ['objetivo', 'objetivo'], ['participantes', 'participantes'], ['fortes', 'pontosFortes'], ['aprimorar', 'aprimorar']]
+    .forEach(([i, c]) => { $('#en-' + i).oninput = (e) => { encerramento[c] = e.target.value; }; });
+  $('#en-salvar').onclick = async () => {
+    try { await setDoc(doc(db, 'auditoria_encerramentos', String(anoEnc)), encerramento); toast('Encerramento salvo'); }
+    catch (e) { alert('Erro ao salvar: ' + (e.message || e)); }
+  };
+}
+
+function pdfEncerramento() {
+  const e = encerramento, ids = new Set(e.auditoriaIds || []);
+  const auds = auditorias.filter(a => ids.has(a.id));
+  const cons = []; auds.forEach(a => (a.itens || []).forEach(i => { if (i.resultado === 'NC' || i.resultado === 'OM') cons.push({ a, i, k: a.id + ':' + i.id }); }));
+  const nNC = cons.filter(c => c.i.resultado === 'NC').length, nOM = cons.length - nNC;
+  const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const [ay, am, ad] = String(e.data || hojeISO()).split('-');
+  const unidades = [...new Set(cons.map(c => c.a.unidade || '—'))];
+  const tab = (lista, rot) => `<table class="t"><tr><th style="width:60px">Item ISO</th><th>${rot}</th><th style="width:110px">Processo</th><th style="width:54px">Melhoria</th><th style="width:64px">Situação</th></tr>
+    ${lista.map(c => `<tr><td>${esc(c.i.isoItem || '')}</td><td>${esc(c.i.evidencia || c.i.pergunta)}</td><td>${esc(c.a.processo)}${c.a.unidade ? ' ' + esc(c.a.unidade) : ''}</td><td>${esc(c.i.ram || '-')}</td><td>${esc(e.situacao?.[c.k] || 'Pendente')}</td></tr>`).join('') || '<tr><td colspan="5">-</td></tr>'}</table>`;
+  const html = `${cabecalhoPDF('RG 13 – Ata de encerramento de auditoria interna')}
+    <p><b>Descrição dos assuntos:</b><br>Aos ${Number(ad)} dias do mês de ${meses[Number(am) - 1]} de ${ay}, realizou-se o encerramento da auditoria interna do sistema de gestão na empresa MIRINDOSUL.</p>
+    <p><b>Objetivo desta auditoria:</b><br>${esc(e.objetivo || '').replace(/\n/g, '<br>')}</p>
+    <p>Foram identificados ${nNC} pontos considerados "não conformidades" e ${nOM} "sugestões de melhorias". As não conformidades e sugestões de melhorias foram remetidas às ações corretivas ou preventivas, conforme decidido juntamente com os gestores.</p>
+    ${e.pontosFortes ? `<p><b>Pontos fortes identificados na auditoria:</b><br>${esc(e.pontosFortes).replace(/\n/g, '<br>')}</p>` : ''}
+    ${e.aprimorar ? `<p><b>Pontos que podem ser aprimorados:</b><br>${esc(e.aprimorar).replace(/\n/g, '<br>')}</p>` : ''}
+    ${unidades.map(u => {
+      const l = cons.filter(c => (c.a.unidade || '—') === u);
+      const n = l.filter(c => c.i.resultado === 'NC'), o = l.filter(c => c.i.resultado === 'OM');
+      return `<div style="margin-top:12px"><div class="secao" style="margin-top:0">RESUMO ${esc(u)} — ${String(n.length).padStart(2, '0')} não conformidades · ${String(o.length).padStart(2, '0')} sugestões de melhoria</div>
+        ${tab(n, 'Não conformidades')}${o.length ? tab(o, 'Sugestões de melhoria') : ''}</div>`;
+    }).join('')}
+    <p style="margin-top:18px">${esc(e.local || 'Rio do Sul')}, ${Number(ad)} de ${meses[Number(am) - 1]} de ${ay}.</p>
+    <p><b>Participantes:</b><br>${esc(e.participantes || '').replace(/\n/g, '<br>')}</p>`;
+  gerarPDF(html, `RG 13 - Ata de encerramento de auditoria interna ${anoEnc}.pdf`);
+}
+
+/* ================================================================== MODELOS */
+function renderModelos() {
+  if (modeloEditando) return renderEditorModelo();
+  $('#au-conteudo').innerHTML = `
+    <div class="qc-card">
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div><h3 class="mb-0">Modelos de checklist</h3><p class="qc-hint mb-0">As perguntas de cada processo. Uma auditoria nova copia o modelo — mudar o modelo não altera auditorias já feitas.</p></div>
+        <button class="btn btn-primary btn-sm" id="md-novo"><i class="bi bi-plus-lg"></i> Novo modelo</button>
+      </div>
+      <div class="table-responsive"><table class="table table-sm au-tabela"><thead><tr><th>Modelo</th><th>Processo</th><th>Tipo</th><th>Itens</th><th></th></tr></thead><tbody>
+      ${modelos.map(m => `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.processo)}</td><td>${m.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'}</td><td>${(m.itens || []).length}</td>
+        <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary" data-ed="${m.id}"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-secondary" data-dup="${m.id}" title="Duplicar"><i class="bi bi-copy"></i></button>
+        <button class="btn btn-sm btn-outline-danger" data-ex="${m.id}"><i class="bi bi-trash"></i></button></td></tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+  $('#md-novo').onclick = () => { modeloEditando = { id: 'M' + Date.now(), nome: '', processo: '', tipo: 'sistema', itens: [], novo: true }; renderModelos(); };
+  $('#au-conteudo').onclick = async (e) => {
+    const ed = e.target.closest('[data-ed]'), dup = e.target.closest('[data-dup]'), ex = e.target.closest('[data-ex]');
+    if (ed) { modeloEditando = JSON.parse(JSON.stringify(modelos.find(m => m.id === ed.dataset.ed))); renderModelos(); }
+    if (dup) { const m = modelos.find(x => x.id === dup.dataset.dup); modeloEditando = { ...JSON.parse(JSON.stringify(m)), id: 'M' + Date.now(), nome: m.nome + ' (cópia)', novo: true }; renderModelos(); }
+    if (ex && confirm('Excluir este modelo? Auditorias já feitas não mudam.')) {
+      await deleteDoc(doc(db, 'auditoria_modelos', ex.dataset.ex)); modelos = modelos.filter(m => m.id !== ex.dataset.ex); renderModelos();
+    }
+  };
+}
+function renderEditorModelo() {
+  const m = modeloEditando;
+  $('#au-conteudo').innerHTML = `
+    <div class="qc-card">
+      <div class="row g-2 mb-3">
+        <div class="col-md-5"><label class="form-label small mb-0">Nome do modelo</label><input class="form-control form-control-sm" id="me-nome" value="${esc(m.nome)}"></div>
+        <div class="col-md-4"><label class="form-label small mb-0">Processo</label><input class="form-control form-control-sm" id="me-proc" value="${esc(m.processo)}" list="dl-processos"></div>
+        <div class="col-md-3"><label class="form-label small mb-0">Tipo</label><select class="form-select form-select-sm" id="me-tipo"><option value="sistema">Sistema (RG 12)</option><option value="relampago" ${m.tipo === 'relampago' ? 'selected' : ''}>Relâmpago (RG 71)</option></select></div>
+      </div>
+      <div class="table-responsive"><table class="table table-sm table-bordered au-tabela"><thead><tr><th style="width:140px">Seção</th><th style="width:90px">Item ISO</th><th>Pergunta / o que verificar</th><th style="width:120px">Documento</th><th style="width:96px"></th></tr></thead>
+      <tbody id="me-itens">${(m.itens || []).map((x, k) => `<tr data-k="${k}">
+        <td><input class="form-control form-control-sm" data-c="secao" value="${esc(x.secao)}"></td>
+        <td><input class="form-control form-control-sm" data-c="isoItem" value="${esc(x.isoItem)}"></td>
+        <td><textarea class="form-control form-control-sm" data-c="pergunta" rows="2">${esc(x.pergunta)}</textarea></td>
+        <td><input class="form-control form-control-sm" data-c="docRef" value="${esc(x.docRef || '')}"></td>
+        <td class="text-nowrap"><button class="btn btn-sm btn-light" data-up="${k}">↑</button><button class="btn btn-sm btn-light" data-down="${k}">↓</button><button class="btn btn-sm btn-outline-danger" data-rm="${k}">✕</button></td></tr>`).join('')}</tbody></table></div>
+      <button class="btn btn-sm btn-outline-primary" id="me-add"><i class="bi bi-plus"></i> Pergunta</button>
+      <div class="text-end mt-3"><button class="btn btn-outline-secondary btn-sm" id="me-cancelar">Cancelar</button> <button class="btn btn-primary btn-sm" id="me-salvar"><i class="bi bi-save"></i> Salvar modelo</button></div>
+    </div>`;
+  const ler = () => { m.nome = $('#me-nome').value; m.processo = $('#me-proc').value; m.tipo = $('#me-tipo').value; };
+  $('#me-itens').oninput = (e) => { const c = e.target.dataset.c; if (!c) return; m.itens[Number(e.target.closest('[data-k]').dataset.k)][c] = e.target.value; };
+  $('#me-itens').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return; ler();
+    const mv = (k, d) => { const j = k + d; if (j < 0 || j >= m.itens.length) return; [m.itens[k], m.itens[j]] = [m.itens[j], m.itens[k]]; };
+    if (b.dataset.up) mv(Number(b.dataset.up), -1); if (b.dataset.down) mv(Number(b.dataset.down), 1);
+    if (b.dataset.rm) m.itens.splice(Number(b.dataset.rm), 1);
+    renderEditorModelo();
+  };
+  $('#me-add').onclick = () => { ler(); m.itens.push({ secao: '', isoItem: '', pergunta: '', docRef: '' }); renderEditorModelo(); };
+  $('#me-cancelar').onclick = () => { modeloEditando = null; renderModelos(); };
+  $('#me-salvar').onclick = async () => {
+    ler();
+    if (!m.nome || !m.processo) { alert('Preencha nome e processo.'); return; }
+    const dados = { nome: m.nome, processo: m.processo, tipo: m.tipo, ordem: m.ordem ?? modelos.length, itens: m.itens.filter(x => x.pergunta.trim()) };
+    try {
+      await setDoc(doc(db, 'auditoria_modelos', m.id), dados);
+      const k = modelos.findIndex(x => x.id === m.id);
+      if (k >= 0) modelos[k] = { id: m.id, ...dados }; else modelos.push({ id: m.id, ...dados });
+      modeloEditando = null; toast('Modelo salvo'); renderModelos();
+    } catch (e) { alert('Erro ao salvar: ' + (e.message || e)); }
+  };
+}
+</script>
+</body>
+</html>

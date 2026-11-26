@@ -27,5 +27,19 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Auditorias",
+      "short_name": "Auditorias",
+      "description": "Fazer uma auditoria (checklist com fotos)",
+      "url": "./modulos/auditorias.html#auditorias",
+      "icons": [
+        {
+          "src": "./assets/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

@@ -6,7 +6,7 @@ rules_version = '2';
 // documentos da Biblioteca (Manual da Qualidade, PG, IT, etc.) — é
 // conteúdo de referência da empresa, não precisa de papel específico.
 //
-// Escrita: bloqueada para qualquer cliente. O upload/atualização dos
+// Escrita da biblioteca: bloqueada para qualquer cliente. O upload/atualização dos
 // documentos é feito só pelo script administrativo (Admin SDK, usando
 // a chave de serviço), nunca pelo navegador. Isso evita que alguém
 // logado suba ou apague arquivos direto pelo site.
@@ -15,6 +15,18 @@ service firebase.storage {
     match /biblioteca_documentos/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if false;
+    }
+
+    // Registros de treinamento (RG 24 assinado, PDF ou foto) do módulo
+    // de Competências — exclusivo da qualidade, igual ao próprio RG 22.
+    // Usa o perfil do Firestore (na 1ª publicação o console pede pra
+    // liberar o acesso do Storage ao Firestore: clique em "Permitir").
+    match /rg22_registros/{allPaths=**} {
+      allow read, delete: if request.auth != null
+        && firestore.get(/databases/(default)/documents/usuarios_perfil/$(request.auth.uid)).data.papel == "qualidade";
+      allow create, update: if request.auth != null
+        && firestore.get(/databases/(default)/documents/usuarios_perfil/$(request.auth.uid)).data.papel == "qualidade"
+        && request.resource.size < 25 * 1024 * 1024;
     }
 
     // Qualquer outro caminho no bucket: bloqueado por padrão.

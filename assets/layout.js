@@ -28,6 +28,7 @@ const ICONES_MODULO = {
   'resultado-veiculo': 'bi-truck',
   'rg09': 'bi-send-fill',
   'rg10': 'bi-shield-check',
+  'auditorias': 'bi-clipboard2-data-fill',
 };
 
 export function escapeHtml(str) {
