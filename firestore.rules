@@ -292,6 +292,15 @@ service cloud.firestore {
       }
     }
 
+    // Registros de treinamento do RG 22 (RG 24 assinado, PDF ou foto), guardados
+    // em pedaços no próprio Firestore (sem Storage). Só a qualidade, como o RG 22.
+    match /rg22_arquivos/{id} {
+      allow read, write: if souQualidade();
+      match /partes/{n} {
+        allow read, write: if souQualidade();
+      }
+    }
+
     match /auditoria_modelos/{id} {
       allow read: if temPermissao("auditorias");
       allow write: if souQualidade();
@@ -303,6 +312,23 @@ service cloud.firestore {
     }
 
     match /auditoria_encerramentos/{ano} {
+      allow read: if temPermissao("auditorias");
+      allow write: if souQualidade();
+    }
+
+    // Arquivo das auditorias antigas (RG 11/12/13 em Word, certificadora, SASSMAQ),
+    // importado pelo importar_auditorias.py: dados + conteúdo em pedaços.
+    match /auditoria_arquivos/{id} {
+      allow read: if temPermissao("auditorias");
+      allow write: if souQualidade();
+      match /partes/{n} {
+        allow read: if temPermissao("auditorias");
+        allow write: if souQualidade();
+      }
+    }
+
+    // Banco de perguntas pra sortear (procedimentos + auditorias anteriores).
+    match /auditoria_banco/{id} {
       allow read: if temPermissao("auditorias");
       allow write: if souQualidade();
     }

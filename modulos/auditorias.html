@@ -127,6 +127,16 @@
       .au-extra { grid-template-columns:1fr; }
       .au-tab { font-size:12px; padding:7px 11px; }
     }
+  .au-sorteio { background:#f3f7ff; border:1px dashed #9db8e8; border-radius:10px; padding:10px 12px; }
+  .au-previa { border-left:3px solid #1f4e9c; padding:4px 8px; margin-bottom:6px; background:#f8fafd; font-size:.9rem; }
+  .au-importada { background:#fff8e1; border:1px solid #f0d58a; border-radius:8px; padding:6px 10px; font-size:.85rem; }
+  .au-ciclo { border:1px solid #e3e8f0; border-radius:10px; margin-bottom:10px; background:#fff; }
+  .au-ciclo > summary { padding:10px 12px; cursor:pointer; list-style:none; }
+  .au-ciclo > summary::-webkit-details-marker { display:none; }
+  .au-ciclo > summary::before { content:'▸'; display:inline-block; width:16px; color:#1f4e9c; }
+  .au-ciclo[open] > summary::before { content:'▾'; }
+  .au-arq { display:flex; align-items:center; gap:8px; padding:6px 12px; border-top:1px solid #f0f2f6; font-size:.9rem; }
+  .au-arq > i { font-size:1.15rem; }
   </style>
 </head>
 <body class="qc-body">
@@ -139,6 +149,7 @@
       <button class="au-tab" data-tab="auditorias"><i class="bi bi-clipboard2-check"></i>Auditorias</button>
       <button class="au-tab" data-tab="programa"><i class="bi bi-calendar3"></i>Programa (RG 11)</button>
       <button class="au-tab" data-tab="encerramento"><i class="bi bi-journal-check"></i>Encerramento (RG 13)</button>
+      <button class="au-tab" data-tab="historico"><i class="bi bi-archive"></i>Histórico</button>
       <button class="au-tab so-qualidade" data-tab="modelos"><i class="bi bi-list-check"></i>Modelos de checklist</button>
     </div>
     <div id="au-conteudo"></div>
@@ -171,6 +182,17 @@
           <div class="col-md-3"><label class="form-label">Data</label><input id="ma-data" type="date" class="form-control"></div>
           <div class="col-md-6"><label class="form-label">Auditor(es)</label><input id="ma-auditores" class="form-control" list="dl-pessoas" placeholder="Separe por vírgula"></div>
           <div class="col-md-6"><label class="form-label">Responsável pelo processo (auditado)</label><input id="ma-responsavel" class="form-control" list="dl-pessoas"></div>
+          <div class="col-md-12" id="ma-sorteio-box">
+            <div class="au-sorteio">
+              <div class="fw-semibold mb-1"><i class="bi bi-shuffle"></i> Sortear perguntas extras <span class="text-muted fw-normal small">(dos procedimentos e das auditorias anteriores — cada auditoria fica diferente)</span></div>
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <select id="ma-banco" class="form-select form-select-sm" style="max-width:240px"></select>
+                <div class="input-group input-group-sm" style="width:150px"><span class="input-group-text">Qtd.</span><input id="ma-qtd" type="number" min="0" max="50" value="0" class="form-control"></div>
+                <span class="small text-muted" id="ma-banco-info"></span>
+              </div>
+              <div class="d-flex flex-wrap gap-3 mt-1 small" id="ma-fontes"></div>
+            </div>
+          </div>
           <div class="col-md-12"><label class="form-label">Normas de referência</label><input id="ma-normas" class="form-control" value="ISO 9001:2015"></div>
           <div class="col-md-12">
             <label class="form-label">Documentos auditados</label>
@@ -209,6 +231,34 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Sortear mais perguntas (durante a auditoria) -->
+<div class="modal fade" id="modal-sortear" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-shuffle"></i> Sortear perguntas</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label">Banco de perguntas do processo</label>
+      <select id="ms-banco" class="form-select mb-2"></select>
+      <label class="form-label">Quantas perguntas?</label>
+      <input id="ms-qtd" type="number" min="1" max="50" value="5" class="form-control mb-2">
+      <div class="d-flex flex-wrap gap-3 small mb-2" id="ms-fontes"></div>
+      <div class="small text-muted" id="ms-info"></div>
+      <div id="ms-previa" class="mt-2"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline-secondary" id="ms-sortear"><i class="bi bi-shuffle"></i> Sortear de novo</button>
+      <button class="btn btn-primary" id="ms-adicionar">Adicionar ao checklist</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- Ata importada -->
+<div class="modal fade" id="modal-ata" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="mt-titulo">Ata</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="mt-corpo"></div>
+  </div></div>
 </div>
 
 <!-- Foto ampliada -->
@@ -262,6 +312,9 @@ let programa = null;
 let anoEnc = new Date().getFullYear();
 let encerramento = null;
 let modeloEditando = null;
+let bancos = null;              // auditoria_banco: [{id, processo, perguntas:[{secao,isoItem,pergunta,docRef,fonte}]}]
+let arquivosHist = null;        // auditoria_arquivos (só os dados, sem o conteúdo)
+const FONTES = ['Procedimentos', 'Auditorias anteriores', 'Amostra de CT-e'];
 
 const $ = (s, el = document) => el.querySelector(s);
 const hojeISO = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -351,12 +404,12 @@ function rotear() {
   const h = (location.hash || '#painel').slice(1);
   const [aba, id] = h.split('/');
   if (aba === 'auditoria' && id) { $('#au-conteudo').onclick = null; abrirAuditoria(id); marcarAba('auditorias'); return; }
-  abaAtual = ['painel', 'auditorias', 'programa', 'encerramento', 'modelos'].includes(aba) ? aba : 'painel';
+  abaAtual = ['painel', 'auditorias', 'programa', 'encerramento', 'historico', 'modelos'].includes(aba) ? aba : 'painel';
   if (abaAtual === 'modelos' && !souQualidade) abaAtual = 'painel';
   marcarAba(abaAtual);
   atual = null;
   $('#au-conteudo').onclick = null;
-  ({ painel: renderPainel, auditorias: renderLista, programa: renderPrograma, encerramento: renderEncerramento, modelos: renderModelos })[abaAtual]();
+  ({ painel: renderPainel, auditorias: renderLista, programa: renderPrograma, encerramento: renderEncerramento, historico: renderHistorico, modelos: renderModelos })[abaAtual]();
   window.scrollTo(0, 0);
 }
 function marcarAba(a) { document.querySelectorAll('.au-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === a)); }
@@ -446,7 +499,7 @@ function itemLista(a) {
   return `<div class="au-lista-item ${a.status || ''}" data-abrir="${a.id}">
     <div class="num">${esc(a.numero || '—')}</div>
     <div><div class="tit">${esc(a.processo || '')} ${a.unidade ? '· ' + esc(a.unidade) : ''}</div>
-      <div class="sub">${a.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'} · ${fmtBR(a.data)} · ${esc((a.auditores || []).join(', '))}</div></div>
+      <div class="sub">${a.origem === 'importada' ? '<i class="bi bi-archive" title="Importada do Word"></i> ' : ''}${a.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'} · ${fmtBR(a.data)} · ${esc((a.auditores || []).join(', '))}</div></div>
     <div class="cont">
       ${a.status === 'concluida' ? '<span class="au-pill fim">concluída</span>' : `<span class="au-pill st">${c.resp}/${c.total}</span>`}
       ${c.NC ? `<span class="au-pill nc">${c.NC} NC</span>` : ''}${c.OM ? `<span class="au-pill om">${c.OM} OM</span>` : ''}
@@ -512,7 +565,10 @@ function abrirModalNova(ctx = {}) {
   $('#ma-docs-livre').value = '';
   pintarModelosSelect(lp.processo);
   pintarDocs();
+  $('#ma-sorteio-box').style.display = ed ? 'none' : '';
+  $('#ma-qtd').value = 0;
   modalAud().show();
+  if (!ed) carregarBancos().then(() => prepararSorteio('ma', $('#ma-processo').value)).catch(() => { $('#ma-sorteio-box').style.display = 'none'; });
 }
 function pintarModelosSelect(processo) {
   const tipo = $('#ma-tipo').value;
@@ -526,8 +582,10 @@ let processoAuto = false;   // processo veio do modelo (não foi digitado) — a
 function preencherProcessoDoModelo() {
   const m = modelos.find(x => x.id === $('#ma-modelo').value);
   if (m && (!$('#ma-processo').value || processoAuto)) { $('#ma-processo').value = m.processo; processoAuto = true; }
+  if (bancos) prepararSorteio('ma', $('#ma-processo').value);
 }
 $('#ma-processo').addEventListener('input', () => { processoAuto = false; });
+$('#ma-processo').addEventListener('change', () => { if (bancos) prepararSorteio('ma', $('#ma-processo').value); });
 $('#ma-tipo').onchange = () => pintarModelosSelect($('#ma-processo').value);
 $('#ma-modelo').onchange = preencherProcessoDoModelo;
 function pintarDocs() {
@@ -564,10 +622,13 @@ $('#ma-salvar').onclick = async () => {
       return;
     }
     const m = modelos.find(x => x.id === $('#ma-modelo').value);
+    const itensModelo = (m?.itens || []).map(x => ({ id: uid(), secao: x.secao, isoItem: x.isoItem, pergunta: x.pergunta, docRef: x.docRef || '', resultado: '', evidencia: '', ram: '' }));
+    const qtd = Number($('#ma-qtd').value) || 0;
+    const extras = qtd > 0 && bancos ? sortear($('#ma-banco').value, qtd, fontesMarcadas('ma'), itensModelo) : [];
     const nova = {
       ...cab, tipo: $('#ma-tipo').value, ano: Number(cab.data.slice(0, 4)),
       modeloId: m?.id || '', modeloNome: m?.nome || '',
-      itens: (m?.itens || []).map(x => ({ id: uid(), secao: x.secao, isoItem: x.isoItem, pergunta: x.pergunta, docRef: x.docRef || '', resultado: '', evidencia: '', ram: '' })),
+      itens: [...itensModelo, ...extras],
       status: 'em_andamento', criadoPor: usuarioEmail, unidadeRegistrou: perfil.unidade || '',
       criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(),
       programaLinhaId: novaCtx.linhaPrograma?.id || '',
@@ -614,7 +675,7 @@ async function abrirAuditoria(id) {
   } catch (e) { console.error(e); $('#au-conteudo').innerHTML = '<div class="au-vazio">Erro ao abrir: ' + esc(e.message || e) + '</div>'; }
 }
 
-function podeEditar() { return atual && (atual.status !== 'concluida' || souQualidade); }
+function podeEditar() { return atual && (atual.origem !== 'importada' || atual.editavel) && (atual.status !== 'concluida' || souQualidade); }
 
 function renderExec() {
   const a = atual, c = contar(a.itens || []);
@@ -638,6 +699,8 @@ function renderExec() {
         </div>
       </div>
       ${(a.documentos || []).length ? `<div class="meta mt-1"><span><i class="bi bi-file-earmark-text"></i> ${esc(a.documentos.join('; '))}</span></div>` : ''}
+      ${a.origem === 'importada' ? `<div class="au-importada mt-2"><i class="bi bi-archive"></i> Importada do RG 12 em Word (ciclo ${esc(a.ciclo || '')})${a.editavel ? ' — ainda sem data: complete aqui no portal.' : ' — só leitura.'}
+        ${a.arquivoId ? `<button class="btn btn-sm btn-link p-0 ms-1" data-arquivo="${a.arquivoId}"><i class="bi bi-download"></i> arquivo original</button>` : ''}</div>` : ''}
       <div class="au-progresso"><div style="width:${pct}%"></div></div>
       <div class="d-flex justify-content-between flex-wrap gap-1">
         <span class="small"><b>${c.resp}</b> de ${c.total} respondidos ·
@@ -652,8 +715,9 @@ function renderExec() {
     <div id="ex-itens">${(a.itens || []).map((it, k) => cardItem(it, k)).join('') || '<div class="au-vazio">Checklist em branco — use "Nova constatação" para registrar o que observar.</div>'}</div>
     <div class="au-rodape">
       ${ed ? '<button class="btn btn-outline-primary" id="ex-add"><i class="bi bi-plus-circle"></i> Nova constatação</button>' : ''}
+      ${ed && a.status !== 'concluida' ? '<button class="btn btn-outline-primary" id="ex-sortear"><i class="bi bi-shuffle"></i> Sortear perguntas</button>' : ''}
       <button class="btn btn-outline-dark" id="ex-pdf"><i class="bi bi-file-earmark-pdf"></i> ${a.tipo === 'relampago' ? 'RG 71' : 'RG 12'} em PDF</button>
-      ${a.status !== 'concluida' ? '<button class="btn btn-success" id="ex-concluir"><i class="bi bi-check2-circle"></i> Concluir</button>'
+      ${a.origem === 'importada' && !a.editavel ? '' : a.status !== 'concluida' ? '<button class="btn btn-success" id="ex-concluir"><i class="bi bi-check2-circle"></i> Concluir</button>'
         : (souQualidade ? '<button class="btn btn-outline-secondary" id="ex-reabrir"><i class="bi bi-unlock"></i> Reabrir</button>' : '')}
       ${souQualidade ? '<button class="btn btn-outline-danger" id="ex-excluir" title="Excluir auditoria"><i class="bi bi-trash"></i></button>' : ''}
     </div>
@@ -709,6 +773,8 @@ function ligarExec() {
   $('#ex-concluir') && ($('#ex-concluir').onclick = abrirConcluir);
   $('#ex-reabrir') && ($('#ex-reabrir').onclick = async () => { atual.status = 'em_andamento'; await salvarAtual(true); renderExec(); });
   $('#ex-excluir') && ($('#ex-excluir').onclick = excluirAtual);
+  $('#ex-sortear') && ($('#ex-sortear').onclick = abrirSortear);
+  const bArq = document.querySelector('.au-exec-topo [data-arquivo]'); if (bArq) bArq.onclick = () => baixarArquivo(bArq.dataset.arquivo, bArq);
   $('#ex-add') && ($('#ex-add').onclick = () => {
     atual.itens.push({ id: uid(), livre: true, secao: 'Constatação', isoItem: '', pergunta: '', docRef: '', resultado: '', evidencia: '', ram: '' });
     agendarSalvar(); renderExec();
@@ -1098,20 +1164,21 @@ async function renderPrograma() {
       </div>
       <div class="table-responsive">
         <table class="table table-sm table-bordered au-tabela">
-          <thead><tr><th>Processo</th><th>Unidade</th><th>Documentos</th><th>Auditor(a)</th><th>Responsável</th><th>Mês</th><th>Data prevista</th><th>Realizada</th><th></th></tr></thead>
+          <thead><tr><th>Processo</th><th>Unidade</th><th>Documentos</th><th>Requisitos</th><th>Auditor(a)</th><th>Responsável</th><th>Mês</th><th>Data prevista</th><th>Realizada</th><th></th></tr></thead>
           <tbody id="pg-corpo">
             ${linhas.map(l => `<tr data-l="${l.id}">
               <td><input class="form-control form-control-sm" data-c="processo" value="${esc(l.processo)}" list="dl-processos" ${dis}></td>
               <td><select class="form-select form-select-sm" data-c="unidade" ${dis}>${UNIDADES.map(u => `<option ${l.unidade === u ? 'selected' : ''}>${u}</option>`).join('')}</select></td>
               <td><input class="form-control form-control-sm" data-c="documentos" value="${esc(l.documentos || '')}" ${dis} placeholder="PG 08, IT 02..."></td>
+              <td><input class="form-control form-control-sm" data-c="requisito" value="${esc(l.requisito || '')}" ${dis} placeholder="5, 6, 7.4..." style="min-width:90px"></td>
               <td><input class="form-control form-control-sm" data-c="auditor" value="${esc(l.auditor || '')}" list="dl-pessoas" ${dis}></td>
               <td><input class="form-control form-control-sm" data-c="responsavel" value="${esc(l.responsavel || '')}" list="dl-pessoas" ${dis}></td>
               <td><select class="form-select form-select-sm" data-c="mes" ${dis}>${MESES.map((m, k) => `<option value="${k + 1}" ${Number(l.mes) === k + 1 ? 'selected' : ''}>${m}</option>`).join('')}</select></td>
               <td><input type="date" class="form-control form-control-sm" data-c="dataPrevista" value="${esc(l.dataPrevista || '')}" ${dis}></td>
-              <td class="text-nowrap">${l.auditoriaId ? `<a href="#auditoria/${l.auditoriaId}">${fmtBR(l.dataRealizada) || 'abrir'}</a>` : (Number(l.mes) < new Date().getMonth() + 1 && anoPrograma <= new Date().getFullYear() ? '<span class="au-pill nc">atrasada</span>' : '—')}</td>
-              <td class="text-nowrap">${!l.auditoriaId ? `<button class="btn btn-sm btn-primary" data-iniciar="${l.id}" title="Iniciar esta auditoria"><i class="bi bi-play-fill"></i></button>` : ''}
+              <td class="text-nowrap">${l.auditoriaId ? `<a href="#auditoria/${l.auditoriaId}">${fmtBR(l.dataRealizada) || 'abrir'}</a>` : l.dataRealizada ? fmtBR(l.dataRealizada) : (!l.mes ? '—' : Number(l.mes) < new Date().getMonth() + 1 && anoPrograma <= new Date().getFullYear() ? '<span class="au-pill nc">atrasada</span>' : '—')}</td>
+              <td class="text-nowrap">${!l.auditoriaId && !l.dataRealizada ? `<button class="btn btn-sm btn-primary" data-iniciar="${l.id}" title="Iniciar esta auditoria"><i class="bi bi-play-fill"></i></button>` : ''}
                 ${ed ? `<button class="btn btn-sm btn-outline-danger" data-del="${l.id}"><i class="bi bi-x"></i></button>` : ''}</td>
-            </tr>`).join('') || '<tr><td colspan="9" class="au-vazio">Nenhuma auditoria programada para este ano.</td></tr>'}
+            </tr>`).join('') || '<tr><td colspan="10" class="au-vazio">Nenhuma auditoria programada para este ano.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1162,7 +1229,7 @@ function pdfPrograma() {
   const l = programa.linhas.slice().sort((a, b) => a.processo.localeCompare(b.processo) || a.unidade.localeCompare(b.unidade));
   // agrupa processo+unidade numa linha só, marcando os meses
   const grupos = {};
-  l.forEach(x => { const k = x.processo + '|' + x.unidade; (grupos[k] = grupos[k] || { ...x, meses: {} }).meses[x.mes] = x.auditoriaId ? '✔' : 'X'; });
+  l.forEach(x => { const k = x.processo + '|' + x.unidade; const g = (grupos[k] = grupos[k] || { ...x, meses: {} }); if (x.mes) g.meses[x.mes] = (x.auditoriaId || x.dataRealizada) ? '✔' : 'X'; });
   const html = `${cabecalhoPDF('RG 11 – Programa anual de auditorias do SGI')}
     <table class="t"><tr><td><b>Ano:</b> ${anoPrograma}</td><td><b>Norma(s) de referência:</b> ${esc(programa.normas || 'ISO 9001:2015')}</td>
       <td><b>Elaborado em:</b> ${fmtBR(programa.elaborado)}</td><td><b>Revisado em:</b> ${fmtBR(programa.revisado)}</td><td><b>Responsável:</b> ${esc(programa.responsavel || '')}</td></tr></table>
@@ -1170,10 +1237,154 @@ function pdfPrograma() {
     <table class="t" style="margin-bottom:0"><tr><th>Processo</th>${MESES.map(m => `<th class="mes">${m}</th>`).join('')}</tr>
       ${Object.values(grupos).map(g => `<tr><td>${esc(g.processo)} (${esc(g.unidade)})</td>${MESES.map((m, k) => `<td class="mes">${g.meses[k + 1] || ''}</td>`).join('')}</tr>`).join('')}</table></div>
     <div style="margin-top:12px"><div class="secao" style="margin-top:0">Detalhamento</div>
-    <table class="t" style="margin-bottom:0"><tr><th>Processo</th><th>Documentos</th><th>Auditor(a)</th><th>Responsável pelo processo</th><th>Data prevista</th><th>Data realizada</th></tr>
-      ${l.map(x => `<tr><td>${esc(x.processo)} (${esc(x.unidade)})</td><td>${esc(x.documentos || '')}</td><td>${esc(x.auditor || '')}</td><td>${esc(x.responsavel || '')}</td><td>${x.dataPrevista ? fmtBR(x.dataPrevista) : MESES[(x.mes || 1) - 1]}</td><td>${fmtBR(x.dataRealizada)}</td></tr>`).join('')}</table></div>
+    <table class="t" style="margin-bottom:0"><tr><th>Processo</th><th>Documentos</th><th>Requisitos</th><th>Auditor(a)</th><th>Responsável pelo processo</th><th>Data prevista</th><th>Data realizada</th></tr>
+      ${l.map(x => `<tr><td>${esc(x.processo)} (${esc(x.unidade)})</td><td>${esc(x.documentos || '')}</td><td>${esc(x.requisito || '')}</td><td>${esc(x.auditor || '')}</td><td>${esc(x.responsavel || '')}</td><td>${x.dataPrevista ? fmtBR(x.dataPrevista) : (x.mes ? MESES[x.mes - 1] : '')}</td><td>${fmtBR(x.dataRealizada)}</td></tr>`).join('')}</table></div>
     ${programa.obs ? `<p><b>Obs.:</b> ${esc(programa.obs)}</p>` : ''}`;
   gerarPDF(html, `RG 11 - Programa anual de auditorias ${anoPrograma}.pdf`, { paisagem: true });
+}
+
+/* ================================================== BANCO / SORTEIO DE PERGUNTAS */
+async function carregarBancos() {
+  if (bancos) return bancos;
+  const sn = await getDocs(collection(db, 'auditoria_banco'));
+  bancos = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.processo || '').localeCompare(b.processo || ''));
+  return bancos;
+}
+const semAc = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function bancoDoProcesso(processo) {
+  const p = semAc(processo);
+  if (!p) return null;
+  return bancos.find(b => semAc(b.processo) === p) || bancos.find(b => p.includes(semAc(b.processo)) || semAc(b.processo).includes(p.split(/[ /-]/)[0]));
+}
+function prepararSorteio(px, processo) {
+  if (!bancos || !bancos.length) { $('#' + px + '-sorteio-box') && ($('#' + px + '-sorteio-box').style.display = 'none'); return; }
+  const sel = $('#' + px + '-banco'), atualSel = sel.value;
+  const achou = bancoDoProcesso(processo);
+  sel.innerHTML = bancos.map(b => `<option value="${b.id}">${esc(b.processo)} (${(b.perguntas || []).length})</option>`).join('');
+  sel.value = achou ? achou.id : (atualSel || bancos[0].id);
+  const pintarFontes = () => {
+    const b = bancos.find(x => x.id === sel.value) || { perguntas: [] };
+    const cont = {}; (b.perguntas || []).forEach(q => { cont[q.fonte] = (cont[q.fonte] || 0) + 1; });
+    $('#' + px + '-fontes').innerHTML = FONTES.filter(f => cont[f]).map(f =>
+      `<label><input type="checkbox" data-fonte="${esc(f)}" checked> ${esc(f)} <span class="text-muted">(${cont[f]})</span></label>`).join('');
+  };
+  sel.onchange = pintarFontes;
+  pintarFontes();
+}
+function fontesMarcadas(px) { return [...document.querySelectorAll(`#${px}-fontes [data-fonte]:checked`)].map(c => c.dataset.fonte); }
+function sortear(bancoId, qtd, fontes, jaTem = []) {
+  const b = bancos.find(x => x.id === bancoId); if (!b) return [];
+  const tem = new Set(jaTem.map(i => semAc(i.pergunta)));
+  const pool = (b.perguntas || []).filter(q => fontes.includes(q.fonte) && !tem.has(semAc(q.pergunta)));
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  // espalha entre os documentos: não deixa 1 procedimento só dominar o sorteio
+  const porDoc = {}; pool.forEach(q => (porDoc[q.docRef || ''] = porDoc[q.docRef || ''] || []).push(q));
+  const filas = Object.values(porDoc).sort(() => Math.random() - 0.5), escolhidas = [];
+  while (escolhidas.length < qtd && filas.some(f => f.length)) filas.forEach(f => { if (f.length && escolhidas.length < qtd) escolhidas.push(f.shift()); });
+  return escolhidas.map(q => ({ id: uid(), sorteada: true, secao: q.secao || 'Pergunta sorteada', isoItem: q.isoItem || '', pergunta: q.pergunta,
+    docRef: q.docRef || '', fonte: q.fonte, resultado: '', evidencia: '', ram: '' }));
+}
+let previaSorteio = [];
+async function abrirSortear() {
+  try { await carregarBancos(); } catch (e) { alert('Banco de perguntas indisponível: ' + (e.message || e)); return; }
+  if (!bancos.length) { alert('O banco de perguntas ainda não foi importado (rode o importar_auditorias.py).'); return; }
+  prepararSorteio('ms', atual.processo);
+  const refazer = () => {
+    previaSorteio = sortear($('#ms-banco').value, Number($('#ms-qtd').value) || 0, fontesMarcadas('ms'), atual.itens);
+    $('#ms-info').textContent = previaSorteio.length ? '' : 'Nenhuma pergunta nova com esses filtros.';
+    $('#ms-previa').innerHTML = previaSorteio.map((q, k) => `<div class="au-previa"><b>${k + 1}.</b> ${esc(q.pergunta)}<div class="small text-muted">${esc(q.docRef || q.secao)} · ${esc(q.fonte)}</div></div>`).join('');
+  };
+  $('#ms-sortear').onclick = refazer;
+  $('#ms-banco').addEventListener('change', refazer);
+  $('#ms-qtd').onchange = refazer; $('#ms-fontes').onchange = refazer;
+  refazer();
+  $('#ms-adicionar').onclick = () => {
+    if (!previaSorteio.length) return;
+    atual.itens.push(...previaSorteio); previaSorteio = [];
+    bootstrap.Modal.getOrCreateInstance('#modal-sortear').hide();
+    agendarSalvar(); renderExec(); toast('Perguntas adicionadas no fim do checklist');
+  };
+  bootstrap.Modal.getOrCreateInstance('#modal-sortear').show();
+}
+
+/* ================================================================ HISTÓRICO */
+async function baixarArquivo(id, btn) {
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+  try {
+    const m = await getDoc(doc(db, 'auditoria_arquivos', id));
+    if (!m.exists()) throw new Error('arquivo não encontrado');
+    const meta = m.data();
+    const sp = await getDocs(collection(db, 'auditoria_arquivos', id, 'partes'));
+    const b64 = sp.docs.sort((a, b) => Number(a.id) - Number(b.id)).map(d => d.data().d).join('');
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([u8], { type: meta.tipo || 'application/octet-stream' }));
+    const a = document.createElement('a'); a.href = url; a.download = meta.nome || 'arquivo';
+    if ((meta.tipo || '').includes('pdf')) a.target = '_blank';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { console.error(e); alert('Não foi possível baixar: ' + (e.message || e)); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
+}
+let atasImportadas = null, filtroHist = { tipo: 'interna', texto: '' };
+async function renderHistorico() {
+  $('#au-conteudo').innerHTML = '<div class="au-vazio">Carregando o arquivo de auditorias...</div>';
+  try {
+    if (!arquivosHist) arquivosHist = (await getDocs(collection(db, 'auditoria_arquivos'))).docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!atasImportadas) atasImportadas = (await getDocs(collection(db, 'auditoria_encerramentos'))).docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.importado);
+  } catch (e) { $('#au-conteudo').innerHTML = '<div class="au-vazio">Sem acesso ao arquivo: ' + esc(e.message || e) + '</div>'; return; }
+  if (!arquivosHist.length) { $('#au-conteudo').innerHTML = '<div class="qc-card"><div class="au-vazio">Nenhum arquivo importado ainda.<br><small>Rode o <b>importar_auditorias.py</b> (pasta Software da qualidade) para trazer os RG 11, RG 12, RG 13 e os arquivos externos/SASSMAQ.</small></div></div>'; return; }
+  const tipos = [['interna', 'Auditorias internas'], ['externa', 'Auditorias externas (certificadora)'], ['sassmaq', 'SASSMAQ'], ['outros', 'Outros']];
+  const ordemCiclo = (c) => { const a = arquivosHist.find(x => x.ciclo === c); return (a?.ano || 0) * 100 + (a?.mes || 0); };
+  const pintar = () => {
+    const t = semAc(filtroHist.texto);
+    const l = arquivosHist.filter(a => (a.tipoAuditoria || 'outros') === filtroHist.tipo || (filtroHist.tipo === 'outros' && !tipos.slice(0, 3).some(x => x[0] === a.tipoAuditoria)))
+      .filter(a => !t || semAc(`${a.nome} ${a.caminho} ${a.ciclo}`).includes(t));
+    const ciclos = {}; l.forEach(a => (ciclos[a.ciclo || 'sem data'] = ciclos[a.ciclo || 'sem data'] || []).push(a));
+    const icone = (n) => /\.pdf$/i.test(n) ? 'bi-file-earmark-pdf text-danger' : /\.docx?$/i.test(n) ? 'bi-file-earmark-word text-primary' : /\.xlsx?$/i.test(n) ? 'bi-file-earmark-excel text-success' : /\.(jpe?g|png)$/i.test(n) ? 'bi-file-earmark-image' : 'bi-file-earmark';
+    $('#hi-lista').innerHTML = Object.keys(ciclos).sort((a, b) => ordemCiclo(b) - ordemCiclo(a)).map(c => {
+      const atas = filtroHist.tipo === 'interna' ? atasImportadas.filter(e => e.ciclo === c) : [];
+      const auds = auditorias.filter(a => a.origem === 'importada' && a.ciclo === c);
+      const nc = auds.reduce((s, a) => s + contar(a.itens || []).NC, 0), om = auds.reduce((s, a) => s + contar(a.itens || []).OM, 0);
+      return `<details class="au-ciclo" ${filtroHist.texto ? 'open' : ''}><summary><b>${esc(c === 'sem data' ? 'Sem data / geral' : 'Ciclo ' + c)}</b>
+          <span class="text-muted small ms-2">${ciclos[c].length} arquivo(s)${auds.length ? ` · ${auds.length} RG 12` : ''}</span>
+          ${nc ? `<span class="au-pill nc ms-1">${nc} NC</span>` : ''}${om ? `<span class="au-pill om ms-1">${om} OM</span>` : ''}</summary>
+        ${atas.map(e => `<div class="au-arq"><i class="bi bi-journal-check text-success"></i><span class="flex-grow-1">Ata de encerramento (RG 13)${e.unidade ? ' – ' + esc(e.unidade) : ''} · ${(e.nc || []).length} NC / ${(e.om || []).length} OM</span>
+          <button class="btn btn-sm btn-outline-secondary" data-ata="${e.id}">Ver ata</button></div>`).join('')}
+        ${ciclos[c].sort((a, b) => (a.tipoDoc || '').localeCompare(b.tipoDoc || '') || a.nome.localeCompare(b.nome)).map(a => `<div class="au-arq">
+          <i class="bi ${icone(a.nome)}"></i><span class="flex-grow-1 text-break">${esc(a.nome)} <span class="text-muted small">· ${(a.tamanho / 1024 / 1024).toFixed(a.tamanho > 1048576 ? 1 : 2)} MB${a.copiaDe ? ' · cópia' : ''}</span></span>
+          ${a.auditoriaId ? `<a class="btn btn-sm btn-outline-primary" href="#auditoria/${a.auditoriaId}" title="Abrir no portal"><i class="bi bi-eye"></i></a>` : ''}
+          <button class="btn btn-sm btn-outline-dark" data-baixar="${a.id}" title="Baixar o original"><i class="bi bi-download"></i></button></div>`).join('')}
+      </details>`;
+    }).join('') || '<div class="au-vazio">Nada encontrado.</div>';
+  };
+  $('#au-conteudo').innerHTML = `<div class="qc-card">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <div class="au-filtros m-0" id="hi-tipos">${tipos.map(([k, r]) => `<button class="au-tab ${filtroHist.tipo === k ? 'active' : ''}" data-t="${k}">${r}</button>`).join('')}</div>
+        <input class="form-control form-control-sm ms-auto" style="max-width:240px" id="hi-busca" placeholder="Buscar arquivo..." value="${esc(filtroHist.texto)}">
+      </div>
+      <div id="hi-lista"></div>
+    </div>`;
+  pintar();
+  $('#hi-tipos').onclick = (e) => { const b = e.target.closest('[data-t]'); if (!b) return; filtroHist.tipo = b.dataset.t; document.querySelectorAll('#hi-tipos .au-tab').forEach(x => x.classList.toggle('active', x === b)); pintar(); };
+  $('#hi-busca').oninput = (e) => { filtroHist.texto = e.target.value; pintar(); };
+  $('#hi-lista').onclick = (e) => {
+    const b = e.target.closest('[data-baixar]'); if (b) { baixarArquivo(b.dataset.baixar, b); return; }
+    const at = e.target.closest('[data-ata]'); if (at) abrirAta(atasImportadas.find(x => x.id === at.dataset.ata));
+  };
+}
+function abrirAta(e) {
+  if (!e) return;
+  const lista = (l, cls) => l.length ? `<table class="table table-sm table-bordered"><thead><tr><th>Item ISO</th><th>Constatação</th><th>Processo</th><th>Unid.</th><th>RAM</th></tr></thead><tbody>${l.map(x =>
+    `<tr><td>${esc(x.isoItem || '')}</td><td>${esc(x.descricao || x.texto || '')}</td><td>${esc(x.processo || '')}</td><td>${esc(x.unidade || '')}</td><td>${esc(x.melhoria && x.melhoria !== '-' ? x.melhoria : '')}</td></tr>`).join('')}</tbody></table>` : '<div class="small text-muted mb-2">Nenhuma.</div>';
+  $('#mt-titulo').textContent = `Ata de encerramento – ciclo ${e.ciclo}${e.unidade ? ' – ' + e.unidade : ''}`;
+  $('#mt-corpo').innerHTML = `<div style="white-space:pre-wrap" class="small mb-3">${esc(e.texto || '')}</div>
+    <h6 class="text-danger">Não conformidades (${(e.nc || []).length})</h6>${lista(e.nc || [])}
+    <h6 style="color:#9a6b00">Oportunidades de melhoria (${(e.om || []).length})</h6>${lista(e.om || [])}
+    ${e.arquivoId ? `<button class="btn btn-sm btn-outline-dark" id="mt-baixar"><i class="bi bi-download"></i> Baixar o Word original</button>` : ''}`;
+  $('#mt-baixar') && ($('#mt-baixar').onclick = (ev) => baixarArquivo(e.arquivoId, ev.currentTarget));
+  bootstrap.Modal.getOrCreateInstance('#modal-ata').show();
 }
 
 /* ========================================================= ENCERRAMENTO RG 13 */
