@@ -1335,11 +1335,11 @@ async function renderHistorico() {
     if (!atasImportadas) atasImportadas = (await getDocs(collection(db, 'auditoria_encerramentos'))).docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.importado);
   } catch (e) { $('#au-conteudo').innerHTML = '<div class="au-vazio">Sem acesso ao arquivo: ' + esc(e.message || e) + '</div>'; return; }
   if (!arquivosHist.length) { $('#au-conteudo').innerHTML = '<div class="qc-card"><div class="au-vazio">Nenhum arquivo importado ainda.<br><small>Rode o <b>importar_auditorias.py</b> (pasta Software da qualidade) para trazer os RG 11, RG 12, RG 13 e os arquivos externos/SASSMAQ.</small></div></div>'; return; }
-  const tipos = [['interna', 'Auditorias internas'], ['externa', 'Auditorias externas (certificadora)'], ['sassmaq', 'SASSMAQ'], ['outros', 'Outros']];
+  const tipos = [['interna', 'Auditorias internas'], ['rotina', 'Auditorias de rotina (RG 17)'], ['externa', 'Auditorias externas (certificadora)'], ['sassmaq', 'SASSMAQ'], ['outros', 'Outros']];
   const ordemCiclo = (c) => { const a = arquivosHist.find(x => x.ciclo === c); return (a?.ano || 0) * 100 + (a?.mes || 0); };
   const pintar = () => {
     const t = semAc(filtroHist.texto);
-    const l = arquivosHist.filter(a => (a.tipoAuditoria || 'outros') === filtroHist.tipo || (filtroHist.tipo === 'outros' && !tipos.slice(0, 3).some(x => x[0] === a.tipoAuditoria)))
+    const l = arquivosHist.filter(a => (a.tipoAuditoria || 'outros') === filtroHist.tipo || (filtroHist.tipo === 'outros' && !tipos.slice(0, 4).some(x => x[0] === a.tipoAuditoria)))
       .filter(a => !t || semAc(`${a.nome} ${a.caminho} ${a.ciclo}`).includes(t));
     const ciclos = {}; l.forEach(a => (ciclos[a.ciclo || 'sem data'] = ciclos[a.ciclo || 'sem data'] || []).push(a));
     const icone = (n) => /\.pdf$/i.test(n) ? 'bi-file-earmark-pdf text-danger' : /\.docx?$/i.test(n) ? 'bi-file-earmark-word text-primary' : /\.xlsx?$/i.test(n) ? 'bi-file-earmark-excel text-success' : /\.(jpe?g|png)$/i.test(n) ? 'bi-file-earmark-image' : 'bi-file-earmark';
@@ -1347,7 +1347,7 @@ async function renderHistorico() {
       const atas = filtroHist.tipo === 'interna' ? atasImportadas.filter(e => e.ciclo === c) : [];
       const auds = auditorias.filter(a => a.origem === 'importada' && a.ciclo === c);
       const nc = auds.reduce((s, a) => s + contar(a.itens || []).NC, 0), om = auds.reduce((s, a) => s + contar(a.itens || []).OM, 0);
-      return `<details class="au-ciclo" ${filtroHist.texto ? 'open' : ''}><summary><b>${esc(c === 'sem data' ? 'Sem data / geral' : 'Ciclo ' + c)}</b>
+      return `<details class="au-ciclo" ${filtroHist.texto ? 'open' : ''}><summary><b>${esc(c === 'sem data' ? 'Sem data / geral' : /^rotina/.test(c) ? 'Auditorias de rotina ' + c.replace(/^rotina\s*/, '') : 'Ciclo ' + c)}</b>
           <span class="text-muted small ms-2">${ciclos[c].length} arquivo(s)${auds.length ? ` · ${auds.length} RG 12` : ''}</span>
           ${nc ? `<span class="au-pill nc ms-1">${nc} NC</span>` : ''}${om ? `<span class="au-pill om ms-1">${om} OM</span>` : ''}</summary>
         ${atas.map(e => `<div class="au-arq"><i class="bi bi-journal-check text-success"></i><span class="flex-grow-1">Ata de encerramento (RG 13)${e.unidade ? ' – ' + esc(e.unidade) : ''} · ${(e.nc || []).length} NC / ${(e.om || []).length} OM</span>
