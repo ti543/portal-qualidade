@@ -17,6 +17,8 @@
   h1 { color:#fff; font-size:20px; margin:4px 0 12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .card { background:#fff; border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,.18); }
   label { font-size:13px; font-weight:600; color:#44526e; display:block; margin-bottom:4px; }
+  input.mai { text-transform:uppercase; }
+  .info b, .placa-tit { text-transform:uppercase; }
   input { width:100%; padding:9px 10px; border:1px solid #c9d3e6; border-radius:8px; font-size:15px; font-family:inherit; }
   .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
   .bt { background:#0b3d91; color:#fff; border:0; border-radius:8px; padding:10px 16px; font-weight:700; font-size:15px; cursor:pointer; }
@@ -62,8 +64,8 @@
     <div class="card oculto" id="dica-ios" style="font-size:14px">Para instalar no iPhone: toque em <b>Compartilhar</b> (quadrado com seta) e depois em <b>Adicionar à Tela de Início</b>.</div>
     <div class="card">
       <div class="grid">
-        <div><label>Placa</label><input id="f-placa" placeholder="ex.: RXU6I96" style="text-transform:uppercase"><div class="dica">uma ou mais, separadas por vírgula</div></div>
-        <div><label>Motorista</label><input id="f-motorista" placeholder="opcional"><div class="dica">procura em qual veículo ele está agora</div></div>
+        <div><label>Placa</label><input id="f-placa" class="mai" placeholder="EX.: RXU6I96" autocapitalize="characters"><div class="dica">uma ou mais, separadas por vírgula</div></div>
+        <div><label>Motorista</label><input id="f-motorista" class="mai" placeholder="OPCIONAL" autocapitalize="characters"><div class="dica">procura em qual veículo ele está agora</div></div>
         <div><label>Início</label><input id="f-ini" type="datetime-local"></div>
         <div><label>Fim</label><input id="f-fim" type="datetime-local"></div>
         <div><label>Mínimo (min)</label><input id="f-min" type="number" min="0" value="5"><div class="dica">ignora desligados menores que isso</div></div>
@@ -207,7 +209,7 @@ $('#lista').addEventListener('click', async (e) => {
 $('#f-pedir').onclick = async () => {
   $('#f-erro').textContent = '';
   const placa = $('#f-placa').value.toUpperCase().replace(/[^A-Z0-9, ]/g, '').trim();
-  const motorista = $('#f-motorista').value.trim();
+  const motorista = $('#f-motorista').value.trim().toUpperCase();
   const ini = $('#f-ini').value, fim = $('#f-fim').value;
   const minimo = Math.max(0, parseInt($('#f-min').value || '0', 10) || 0);
   if (!placa && !motorista) { $('#f-erro').textContent = 'Informe a placa e/ou o motorista.'; return; }
@@ -224,6 +226,9 @@ $('#f-pedir').onclick = async () => {
     $('#f-erro').textContent = 'Não foi possível enviar: ' + (e.code || e.message || e);
   } finally { $('#f-pedir').disabled = false; }
 };
+document.querySelectorAll('input.mai').forEach(el => el.addEventListener('input', () => {
+  const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {}
+}));
 </script>
 </body>
 </html>
