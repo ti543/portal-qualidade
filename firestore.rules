@@ -231,6 +231,16 @@ service cloud.firestore {
       allow read: if logado();
     }
 
+    // Conteúdo grande (com imagens) de cada revisão da Biblioteca, em pedaços
+    match /biblioteca_conteudos/{id} {
+      allow read: if temPermissao("documentos") || temPermissao("auditorias");
+      allow write: if souQualidade();
+      match /partes/{n} {
+        allow read: if temPermissao("documentos") || temPermissao("auditorias");
+        allow write: if souQualidade();
+      }
+    }
+
     // Word original de cada documento da Biblioteca (sem Storage: base64 em pedaços)
     match /biblioteca_arquivos/{id} {
       allow read: if temPermissao("documentos") || temPermissao("auditorias");

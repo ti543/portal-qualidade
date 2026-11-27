@@ -104,6 +104,16 @@
     .doc-linha-acoes { display: flex; gap: 6px; flex-shrink: 0; }
     .doc-linha-acoes .qc-btn { padding: 5px 10px; font-size: 12px; }
 
+    /* Categorias recolhiveis (clicar no titulo abre/fecha a lista) */
+    .doc-cat-cab { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; margin-bottom: 0 !important; }
+    .doc-cat-cab .doc-cat-qtd { font-size: 11px; font-weight: 700; background: #eef2ff; color: var(--qc-primary); padding: 2px 9px; border-radius: 10px; }
+    .doc-cat-cab .bi-chevron-down { margin-left: auto; transition: transform .2s; }
+    .qc-card.doc-cat-fechada .doc-lista { display: none; }
+    .qc-card.doc-cat-fechada .bi-chevron-down { transform: rotate(-90deg); }
+    .qc-card:not(.doc-cat-fechada) .doc-cat-cab { margin-bottom: 10px !important; }
+    .doc-cat-botoes { display: flex; gap: 8px; margin-bottom: 10px; }
+    .doc-cat-botoes button { background: none; border: none; color: var(--qc-primary); font-size: 12.5px; cursor: pointer; text-decoration: underline; padding: 0; }
+
     #doc-estado-vazio, #doc-estado-erro, #doc-estado-carregando {
       display: none;
     }
@@ -183,16 +193,24 @@
        (1 OBJETIVO, 7 PAPÉIS..., 7.1 Estrutura organizacional...) — sem
        cor, pra não ficar um título azul do nada e outro preto ao lado só
        por causa de qual estilo do Word cada um usava. */
-    .doc-conteudo-leitura.is-html h1 { font-size: 15px; font-weight: 700; color: #000; margin: 16px 0 8px; }
-    .doc-conteudo-leitura.is-html h2 { font-size: 13.5px; font-weight: 700; color: #000; margin: 14px 0 7px; }
-    .doc-conteudo-leitura.is-html h3 { font-size: 13.5px; font-weight: 700; color: #000; margin: 12px 0 6px; }
+    /* TODOS os niveis de titulo do Word (h1..h6) com o MESMO tamanho, preto e
+       em negrito - antes h4/h5/h6 ficavam no tamanho padrao do navegador
+       (menores), por isso alguns titulos pareciam "encolhidos". */
+    .doc-conteudo-leitura.is-html h1, .doc-conteudo-leitura.is-html h2, .doc-conteudo-leitura.is-html h3,
+    .doc-conteudo-leitura.is-html h4, .doc-conteudo-leitura.is-html h5, .doc-conteudo-leitura.is-html h6 {
+      font-size: 14px; font-weight: 700; color: #000; margin: 14px 0 7px; line-height: 1.4;
+    }
+    .doc-conteudo-leitura.is-html h1 *, .doc-conteudo-leitura.is-html h2 *, .doc-conteudo-leitura.is-html h3 *,
+    .doc-conteudo-leitura.is-html h4 *, .doc-conteudo-leitura.is-html h5 *, .doc-conteudo-leitura.is-html h6 * { font-size: inherit; font-weight: 700; }
     /* Tabelas importadas do Word — o mammoth só traz o texto de cada célula,
        sem bordas; aqui a gente desenha as bordas pra ficar igual ao Word.
        "width:auto" + "margin:auto" centraliza tabelas mais estreitas que a
        área de texto (ex: uma tabelinha de 3 colunas) em vez de forçar
        largura 100% sempre; uma tabela que já precisa da largura toda
        continua ocupando ela (max-width cuida disso). */
-    .doc-conteudo-leitura.is-html table { border-collapse: collapse; width: auto; max-width: 100%; margin: 10px auto; font-size: 12.5px; }
+    /* Todas as tabelas com a largura da pagina inteira (inclusive as de
+       controle de mudancas e aprovacao no fim do documento). */
+    .doc-conteudo-leitura.is-html table { border-collapse: collapse; width: 100% !important; max-width: 100%; margin: 10px 0; font-size: 12.5px; table-layout: auto; }
     .doc-conteudo-leitura.is-html table td, .doc-conteudo-leitura.is-html table th { border: 1px solid #ccc; padding: 6px 8px; vertical-align: top; }
     .doc-conteudo-leitura.is-html table th { background: #eef2ff; font-weight: 700; text-align: center; }
     /* Marcador de quebra de página original do Word (ver
@@ -319,7 +337,9 @@
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { initLayout, escapeHtml, LOGO_URL } from '../assets/layout.js?v=10';
 
-    const CATEGORIAS_PADRAO = ['Manual da Qualidade', 'Procedimentos Gerais', 'Instrução de Trabalho', 'Descrição de Funções'];
+    const CATEGORIAS_PADRAO = ['Manual da Qualidade', 'Manuais', 'Procedimentos Gerais', 'Instrução de Trabalho', 'Descrição de Funções'];
+    const K_CAT_ABERTAS = 'doc_categorias_abertas_v1';
+    let categoriasAbertas = (() => { try { return new Set(JSON.parse(localStorage.getItem(K_CAT_ABERTAS) || '[]')); } catch (e) { return new Set(); } })();
 
     let documentosCarregados = [];
     let podeEditar = false;
@@ -411,11 +431,13 @@
       });
 
       const alvo = document.getElementById('doc-categorias');
-      alvo.innerHTML = categorias.map(cat => {
+      const buscando = !!termo;
+      alvo.innerHTML = `<div class="doc-cat-botoes"><button type="button" data-todas="abrir">Abrir todas</button><button type="button" data-todas="fechar">Fechar todas</button></div>` + categorias.map(cat => {
         const docs = porCategoria[cat].slice().sort((a, b) => (a.codigo || '').localeCompare(b.codigo || '', 'pt-BR', { numeric: true }));
+        const aberta = buscando || categoriasAbertas.has(cat);
         return `
-          <div class="qc-card">
-            <div class="qc-section-title">${escapeHtml(cat)}</div>
+          <div class="qc-card ${aberta ? '' : 'doc-cat-fechada'}" data-cat="${escapeHtml(cat)}">
+            <div class="qc-section-title doc-cat-cab">${escapeHtml(cat)} <span class="doc-cat-qtd">${docs.length}</span><i class="bi bi-chevron-down"></i></div>
             <div class="doc-lista">
               ${docs.map(d => `
                 <div class="doc-linha">
@@ -435,6 +457,17 @@
       alvo.querySelectorAll('[data-ler]').forEach(el => {
         el.addEventListener('click', () => abrirLeitura(el.dataset.ler));
       });
+      const guardarAbertas = () => { try { localStorage.setItem(K_CAT_ABERTAS, JSON.stringify([...categoriasAbertas])); } catch (e) {} };
+      alvo.querySelectorAll('.doc-cat-cab').forEach(cab => cab.addEventListener('click', () => {
+        const card = cab.closest('[data-cat]'), cat = card.dataset.cat;
+        const fechou = card.classList.toggle('doc-cat-fechada');
+        if (fechou) categoriasAbertas.delete(cat); else categoriasAbertas.add(cat);
+        guardarAbertas();
+      }));
+      alvo.querySelectorAll('[data-todas]').forEach(b => b.addEventListener('click', () => {
+        if (b.dataset.todas === 'abrir') categorias.forEach(c => categoriasAbertas.add(c)); else categoriasAbertas.clear();
+        guardarAbertas(); renderizarBiblioteca();
+      }));
     }
 
     function proximaCategoriaCustomOuPadrao(valorSelect, valorTexto) {
@@ -524,7 +557,16 @@
     function interpretarNomeArquivo(nomeSemExtensao) {
       if (/teste|rascunho/i.test(nomeSemExtensao)) return null;
       const m = PADRAO_NOME_ARQUIVO.exec(nomeSemExtensao.trim());
-      if (!m) return null;
+      if (!m) {
+        // Manuais sem codigo no nome (ex.: "Manual do motorista.docx"):
+        // entram na categoria "Manuais" com o codigo "MANUAL" e a chave
+        // vem do titulo (cada manual fica separado).
+        const nome = nomeSemExtensao.trim();
+        if (!/^manual\b/i.test(nome)) return null;
+        const revM = PADRAO_REVISAO_ARQUIVO.exec(nome);
+        return { codigo: 'MANUAL', titulo: (revM ? nome.slice(0, revM.index) : nome).trim(),
+                 revisao: revM ? parseInt(revM[1], 10) : 0, semCodigo: true };
+      }
 
       const codigo = m.groups.codigo.replace(/\s+/g, ' ').trim().toUpperCase();
       const resto = m.groups.resto.trim();
@@ -538,7 +580,12 @@
       return { codigo, titulo, revisao };
     }
 
+    function chaveDoDocumento(categoria, codigo, titulo) {
+      return codigo === 'MANUAL' ? `${slugificar(categoria)}--${slugificar(titulo)}` : `${slugificar(categoria)}--${slugificar(codigo)}`;
+    }
+
     function categoriaPorPrefixo(codigo) {
+      if (codigo === 'MANUAL') return 'Manuais';
       const prefixo = (codigo.split(' ')[0] || '').toUpperCase();
       return CATEGORIA_POR_PREFIXO[prefixo] || '';
     }
@@ -673,7 +720,7 @@
         }
 
         const categoria = categoriaPorPrefixo(interpretado.codigo);
-        const chave = `${slugificar(categoria)}--${slugificar(interpretado.codigo)}`;
+        const chave = chaveDoDocumento(categoria, interpretado.codigo, interpretado.titulo);
         const candidato = {
           chave,
           categoria,
@@ -704,7 +751,7 @@
         area.innerHTML = `
           <div class="qc-card">
             <div class="qc-section-title">Importação</div>
-            <p class="doc-aviso-historico-vazio">Nenhum arquivo reconhecido. Os nomes precisam seguir o padrão "CÓDIGO - Título rev.NN.docx" (ex: "PG 04 - Ações corretivas e preventivas rev.03.docx").</p>
+            <p class="doc-aviso-historico-vazio">Nenhum arquivo reconhecido. Os nomes precisam seguir o padrão "CÓDIGO - Título rev.NN.docx" (ex: "PG 04 - Ações corretivas e preventivas rev.03.docx") ou começar com "Manual" (ex: "Manual do motorista.docx").</p>
           </div>
         `;
         return;
@@ -762,11 +809,10 @@
       tbody.innerHTML = listaImportacao.map((c, i) => {
         const existente = documentosCarregados.find(d => d.id === c.chave);
         const grandeDemais = (c.conteudo || '').length > LIMITE_AVISO_TAMANHO;
-        const situacao = grandeDemais
-          ? `<span class="doc-import-status" style="color:#9c0006;" title="Provavelmente tem imagens grandes demais pro limite do Firestore (1MB por documento)">Pode falhar (muito grande)</span>`
-          : existente
+        const situacao = (existente
             ? `<span class="doc-import-status atualiza">Nova revisão de ${escapeHtml(existente.codigo)}</span>`
-            : `<span class="doc-import-status novo">Documento novo</span>`;
+            : `<span class="doc-import-status novo">Documento novo</span>`)
+          + (grandeDemais ? `<div style="font-size:10.5px;color:#666;" title="Vai em partes, com todas as imagens">grande - sobe em partes</div>` : '');
         return `
           <tr data-indice="${i}">
             <td>
@@ -822,23 +868,24 @@
         }
 
         try {
-          const chave = `${slugificar(c.categoria)}--${slugificar(c.codigo)}`;
+          const chave = chaveDoDocumento(c.categoria, c.codigo, c.titulo);
           const docRef = doc(db, 'biblioteca_documentos', chave);
           const existente = documentosCarregados.find(d => d.id === chave);
           const revisaoFinal = c.revisao ? String(c.revisao).padStart(2, '0') : '';
 
-          // obsoleta + nova revisão numa gravação só: ou grava as duas, ou nenhuma
-          const lote = writeBatch(db);
-          if (existente) {
-            lote.set(doc(collection(docRef, 'versoes_obsoletas')), {
-              revisao: existente.revisao || '',
-              titulo: existente.titulo || '',
-              conteudo: existente.conteudo || '',
-              conteudoFormato: existente.conteudoFormato || 'texto',
-              obsoletoEm: serverTimestamp(),
-              obsoletoPor: auth.currentUser?.email || ''
-            });
+          // 1) primeiro sobe o que é grande (conteúdo com imagens em partes e o
+          //    Word original), cada revisão com o SEU id - assim as revisões
+          //    antigas continuam com o conteúdo e o Word delas.
+          const campoConteudo = await prepararCampoConteudo(chave, revisaoFinal, c.conteudo || '');
+          let arquivoId = null;
+          if (c.arquivo) {
+            try { arquivoId = idDeVersao(chave, revisaoFinal); await salvarArquivoOriginal(arquivoId, c.arquivo); }
+            catch (e) { arquivoId = null; console.error('Original não subiu', c.nomeArquivo, e); falhas.push(`${c.nomeArquivo} (texto ok, Word original não subiu)`); }
           }
+
+          // 2) obsoleta + nova revisão numa gravação só: ou grava as duas, ou nenhuma
+          const lote = writeBatch(db);
+          if (existente) lote.set(doc(collection(docRef, 'versoes_obsoletas')), registroObsoleto(existente));
 
           // { merge: true } é importante aqui: sem isso, o setDoc troca o
           // documento INTEIRO pelo que vier abaixo — e como esse payload não
@@ -850,7 +897,8 @@
             categoria: c.categoria,
             codigo: c.codigo,
             titulo: c.titulo,
-            conteudo: c.conteudo,
+            conteudo: campoConteudo.conteudo,
+            conteudoGrande: campoConteudo.conteudoGrande,
             conteudoFormato: c.conteudoFormato || 'html',
             revisao: revisaoFinal,
             dataRevisao: hojeISO(),
@@ -859,20 +907,9 @@
             atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
           };
           if (!existente) payload.dataCriacao = hojeISO();
-          if (new Blob([c.conteudo || '']).size > 950000) {
-            // imagens grandes estouram o limite de 1 MB do documento: o texto fica sem
-            // as imagens e o Word original (com tudo) fica disponível pra baixar
-            payload.conteudo = (c.conteudo || '').replace(/<img[^>]*>/gi, '') +
-              '<p><em>(As imagens deste documento estão no Word original — use "Baixar Word original".)</em></p>';
-          }
-          if (new Blob([payload.conteudo || '']).size > 950000) throw new Error('conteúdo maior que o limite de 1 MB do Firebase');
-          if (c.arquivo) payload.arquivoOriginal = c.nomeArquivo;
+          if (arquivoId) { payload.arquivoOriginal = c.nomeArquivo; payload.arquivoId = arquivoId; }
           lote.set(docRef, payload, { merge: true });
           await lote.commit();
-          if (c.arquivo) {
-            try { await salvarArquivoOriginal(chave, c.arquivo); }
-            catch (e) { console.error('Original não subiu', c.nomeArquivo, e); falhas.push(`${c.nomeArquivo} (texto ok, Word original não subiu)`); }
-          }
 
           ok++;
         } catch (err) {
@@ -892,6 +929,62 @@
         </div>
       `;
       document.getElementById('doc-import-fechar-resultado').addEventListener('click', () => { area.innerHTML = ''; });
+    }
+
+    // ---------------------------------------------------------------
+    // CONTEÚDO GRANDE (com todas as imagens) — o Firestore aceita até 1 MB
+    // por documento. Conteúdo maior vai em pedaços em
+    // biblioteca_conteudos/{idDaVersao}/partes/{n}; o documento guarda só
+    // { conteudoGrande: { id, partes } }. Cada revisão tem o SEU id, então
+    // as versões obsoletas continuam abrindo com as imagens.
+    // ---------------------------------------------------------------
+    const LIMITE_INLINE = 900000;      // bytes no próprio documento
+    const PEDACO_TXT = 600000;         // caracteres por pedaço (ajustado pra < 950 KB)
+    const cacheConteudo = {};
+    function idDeVersao(chave, revisao) { return `${chave}--r${revisao || '00'}--${Date.now().toString(36)}`; }
+    function fatiarTexto(s) {
+      const out = []; let i = 0;
+      while (i < s.length) {
+        let n = Math.min(PEDACO_TXT, s.length - i), p = s.slice(i, i + n);
+        while (new Blob([p]).size > 950000) { n = Math.floor(n * 0.8); p = s.slice(i, i + n); }
+        out.push(p); i += n;
+      }
+      return out;
+    }
+    async function prepararCampoConteudo(chave, revisao, conteudo) {
+      if (new Blob([conteudo || '']).size <= LIMITE_INLINE) return { conteudo: conteudo || '', conteudoGrande: null };
+      const id = idDeVersao(chave, revisao), partes = fatiarTexto(conteudo);
+      const ref = doc(db, 'biblioteca_conteudos', id);
+      for (let k = 0; k < partes.length; k++) await setDoc(doc(ref, 'partes', String(k)), { d: partes[k] });
+      await setDoc(ref, { partes: partes.length, tamanho: conteudo.length, documento: chave, revisao: revisao || '',
+                          criadoEm: serverTimestamp(), criadoPor: auth.currentUser?.email || '' });
+      cacheConteudo[id] = conteudo;
+      return { conteudo: '', conteudoGrande: { id, partes: partes.length } };
+    }
+    async function obterConteudo(d) {
+      if (!d || !d.conteudoGrande || !d.conteudoGrande.id) return (d && d.conteudo) || '';
+      const g = d.conteudoGrande;
+      if (cacheConteudo[g.id] !== undefined) return cacheConteudo[g.id];
+      const sn = await getDocs(collection(db, 'biblioteca_conteudos', g.id, 'partes'));
+      const txt = sn.docs.filter(x => Number(x.id) < (g.partes || 999)).sort((a, b) => Number(a.id) - Number(b.id)).map(x => x.data().d).join('');
+      cacheConteudo[g.id] = txt;
+      return txt;
+    }
+    // Registro da revisão que vai pra pasta de obsoletas: guarda o conteúdo
+    // (ou o ponteiro pros pedaços) e o Word original DAQUELA revisão.
+    function registroObsoleto(atual) {
+      return {
+        revisao: atual.revisao || '',
+        titulo: atual.titulo || '',
+        conteudo: atual.conteudo || '',
+        conteudoGrande: atual.conteudoGrande || null,
+        conteudoFormato: atual.conteudoFormato || 'texto',
+        arquivoId: atual.arquivoId || (atual.arquivoOriginal ? atual.id : null),
+        arquivoOriginal: atual.arquivoOriginal || '',
+        dataRevisao: atual.dataRevisao || '',
+        obsoletoEm: serverTimestamp(),
+        obsoletoPor: auth.currentUser?.email || ''
+      };
     }
 
     // ---------------------------------------------------------------
@@ -950,7 +1043,7 @@
         <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
           <button type="button" class="qc-btn" id="doc-btn-tela-cheia"><i class="bi bi-arrows-fullscreen"></i> Ler em tela cheia</button>
         </div>
-        <div class="doc-conteudo-leitura${ehHtml ? ' is-html' : ''}">${renderizarConteudoParaLeitura(d.conteudo, d.conteudoFormato)}</div>
+        <div class="doc-conteudo-leitura${ehHtml ? ' is-html' : ''}" id="doc-leitura-conteudo">${d.conteudoGrande ? '<p><em>Carregando o documento (com as imagens)...</em></p>' : renderizarConteudoParaLeitura(d.conteudo, d.conteudoFormato)}</div>
         <div class="doc-form-rodape">
           <div>
             <label class="doc-copia-controlada-opcao"><input type="checkbox" id="doc-chk-copia-controlada"> Cópia controlada</label>
@@ -965,9 +1058,19 @@
         ` : ''}
       `;
 
+      if (d.conteudoGrande) {
+        obterConteudo(d).then(txt => {
+          const el = document.getElementById('doc-leitura-conteudo');
+          if (el) el.innerHTML = renderizarConteudoParaLeitura(txt, d.conteudoFormato);
+        }).catch(e => {
+          const el = document.getElementById('doc-leitura-conteudo');
+          if (el) el.innerHTML = '<p><em>Não foi possível carregar o conteúdo agora. Tente de novo.</em></p>';
+          console.error(e);
+        });
+      }
       document.getElementById('doc-btn-exportar-pdf').addEventListener('click', () => exportarPdf(d));
       const bWord = document.getElementById('doc-btn-baixar-word');
-      if (bWord) bWord.addEventListener('click', () => baixarArquivoOriginal(id, bWord));
+      if (bWord) bWord.addEventListener('click', () => baixarArquivoOriginal(d.arquivoId || id, bWord));
       document.getElementById('doc-btn-tela-cheia').addEventListener('click', alternarTelaCheia);
       if (podeEditar) {
         document.getElementById('doc-btn-editar-do-drawer').addEventListener('click', () => abrirEdicao(id));
@@ -1035,6 +1138,9 @@
       // renderizado (ao contrário de display:none ou visibility:hidden,
       // que o html2canvas captura em branco).
       const ehHtml = d.conteudoFormato === 'html';
+      let conteudoPdf;
+      try { conteudoPdf = await obterConteudo(d); }
+      catch (e) { alert('Não foi possível carregar o documento agora.'); if (btnExportar) { btnExportar.disabled = false; btnExportar.innerHTML = textoOriginalBtn; } return; }
       const largCaptura = 760; // largura do "papel" renderizado, em px CSS
       const container = document.createElement('div');
       container.style.position = 'fixed';
@@ -1048,7 +1154,7 @@
       container.innerHTML = `
         ${renderCabecalhoOficial(d)}
         <div class="doc-conteudo-leitura${ehHtml ? ' is-html' : ''}" style="border:none; border-radius:0; padding:0;">
-          ${renderizarConteudoParaLeitura(d.conteudo, d.conteudoFormato)}
+          ${renderizarConteudoParaLeitura(conteudoPdf, d.conteudoFormato)}
         </div>
       `;
       // A classe ".doc-conteudo-leitura" tem uma borda e cantos arredondados —
@@ -1229,17 +1335,27 @@
           area.innerHTML = '<div class="doc-aviso-historico-vazio">Este documento ainda não teve nenhuma revisão substituída.</div>';
           return;
         }
-        area.innerHTML = snap.docs.map(docSnap => {
-          const v = docSnap.data();
+        const versoes = snap.docs.map(x => x.data());
+        area.innerHTML = versoes.map((v, i) => {
           const data = v.obsoletoEm && v.obsoletoEm.toDate ? v.obsoletoEm.toDate().toLocaleString('pt-BR') : '';
           const ehHtml = v.conteudoFormato === 'html';
           return `
-            <details class="doc-historico-item">
+            <details class="doc-historico-item" data-i="${i}">
               <summary>Revisão ${escapeHtml(v.revisao || '—')} — tornou-se obsoleta em ${escapeHtml(data)}</summary>
-              <div class="doc-conteudo-leitura${ehHtml ? ' is-html' : ''}">${renderizarConteudoParaLeitura(v.conteudo, v.conteudoFormato)}</div>
+              ${v.arquivoId ? `<div style="margin-top:8px;"><button type="button" class="qc-btn" data-baixar-versao="${i}"><i class="bi bi-file-earmark-word"></i> Baixar Word desta revisão</button></div>` : ''}
+              <div class="doc-conteudo-leitura${ehHtml ? ' is-html' : ''}" data-cont="${i}">${v.conteudoGrande ? '<p><em>Abrindo...</em></p>' : renderizarConteudoParaLeitura(v.conteudo, v.conteudoFormato)}</div>
             </details>
           `;
         }).join('');
+        area.querySelectorAll('details[data-i]').forEach(det => det.addEventListener('toggle', async () => {
+          const v = versoes[+det.dataset.i];
+          if (!det.open || !v.conteudoGrande || det.dataset.ok) return;
+          det.dataset.ok = '1';
+          const el = det.querySelector('[data-cont]');
+          try { el.innerHTML = renderizarConteudoParaLeitura(await obterConteudo(v), v.conteudoFormato); }
+          catch (e) { el.innerHTML = '<p><em>Não foi possível abrir esta revisão agora.</em></p>'; det.dataset.ok = ''; }
+        }));
+        area.querySelectorAll('[data-baixar-versao]').forEach(b => b.addEventListener('click', () => baixarArquivoOriginal(versoes[+b.dataset.baixarVersao].arquivoId, b)));
       } catch (err) {
         console.error('Erro ao carregar histórico:', err);
         area.innerHTML = '<div class="doc-aviso-historico-vazio">Não foi possível carregar o histórico agora.</div>';
@@ -1324,7 +1440,7 @@
     // ---------------------------------------------------------------
     let quillEditor = null;
 
-    function montarEditorDeConteudo(d) {
+    async function montarEditorDeConteudo(d) {
       if (!window.Quill) {
         console.error('Quill não carregou — verifique a conexão.');
         return;
@@ -1365,20 +1481,28 @@
         input.click();
       });
 
-      if (d && d.conteudo) {
+      let conteudoAtual = d ? (d.conteudo || '') : '';
+      if (d && d.conteudoGrande) {
+        quillEditor.setText('Carregando o documento...');
+        quillEditor.disable();
+        try { conteudoAtual = await obterConteudo(d); } catch (e) { alert('Não foi possível carregar o documento para editar.'); fecharDrawer(); return; }
+        quillEditor.enable();
+        quillEditor.setText('');
+      }
+      if (d && conteudoAtual) {
         if (d.conteudoFormato === 'html') {
           // O editor (Quill) não entende tabela — se o conteúdo importado do
           // Word tiver uma, avisa antes de deixar editar, pra não perder a
           // formatação da tabela sem querer.
-          if (/<table/i.test(d.conteudo)) {
+          if (/<table/i.test(conteudoAtual)) {
             const aviso = document.getElementById('doc-form-aviso-tabela');
             if (aviso) {
               aviso.innerHTML = `<div class="doc-aviso-tabela"><i class="bi bi-exclamation-triangle"></i> Este documento tem uma tabela importada do Word. O editor aqui não consegue manter tabelas — se você salvar depois de editar, a tabela pode virar texto solto. Se só precisa corrigir um texto pequeno, considere reimportar o Word em vez de editar aqui.</div>`;
             }
           }
-          quillEditor.root.innerHTML = sanitizarHtml(d.conteudo);
+          quillEditor.root.innerHTML = sanitizarHtml(conteudoAtual);
         } else {
-          quillEditor.setText(d.conteudo);
+          quillEditor.setText(conteudoAtual);
         }
       }
     }
@@ -1407,34 +1531,22 @@
       // as duas, ou nenhuma. Antes eram separadas e, se a segunda falhasse
       // (ex.: documento grande demais), ficava uma versão obsoleta falsa.
       const lote = writeBatch(db);
-      const tamanhoConteudo = new Blob([conteudo]).size;
-      if (tamanhoConteudo > 950000) {
-        alert(`O conteúdo está com ${(tamanhoConteudo / 1048576).toFixed(2)} MB e passa do limite do Firebase (1 MB por documento). Diminua as imagens e tente de novo.`);
-        btnSalvar.disabled = false;
-        btnSalvar.textContent = 'Salvar';
-        return;
-      }
       try {
         if (idExistente) {
           const atual = documentosCarregados.find(x => x.id === idExistente);
           const docRef = doc(db, 'biblioteca_documentos', idExistente);
+          const novaRev = proximaRevisao(atual ? atual.revisao : '0');
+          const cc = await prepararCampoConteudo(idExistente, novaRev, conteudo);
 
-          if (atual && atual.conteudo !== undefined) {
-            lote.set(doc(collection(docRef, 'versoes_obsoletas')), {
-              revisao: atual.revisao || '',
-              titulo: atual.titulo || '',
-              conteudo: atual.conteudo || '',
-              conteudoFormato: atual.conteudoFormato || 'texto',
-              obsoletoEm: serverTimestamp(),
-              obsoletoPor: auth.currentUser?.email || ''
-            });
+          if (atual && (atual.conteudo !== undefined || atual.conteudoGrande)) {
+            lote.set(doc(collection(docRef, 'versoes_obsoletas')), registroObsoleto(atual));
           }
 
           lote.update(docRef, {
-            categoria, codigo, titulo, conteudo,
+            categoria, codigo, titulo, conteudo: cc.conteudo, conteudoGrande: cc.conteudoGrande,
             dataCriacao, dataRevisao,
             conteudoFormato: 'html',
-            revisao: proximaRevisao(atual ? atual.revisao : '0'),
+            revisao: novaRev,
             atualizadoEm: serverTimestamp(),
             atualizadoPor: auth.currentUser?.email || (perfilAtual && perfilAtual.unidade) || '',
             atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
@@ -1450,26 +1562,22 @@
               btnSalvar.textContent = 'Salvar';
               return;
             }
-            lote.set(doc(collection(docRef, 'versoes_obsoletas')), {
-              revisao: existente.revisao || '',
-              titulo: existente.titulo || '',
-              conteudo: existente.conteudo || '',
-              conteudoFormato: existente.conteudoFormato || 'texto',
-              obsoletoEm: serverTimestamp(),
-              obsoletoPor: auth.currentUser?.email || ''
-            });
+            const revN = proximaRevisao(existente.revisao);
+            const ccN = await prepararCampoConteudo(novoId, revN, conteudo);
+            lote.set(doc(collection(docRef, 'versoes_obsoletas')), registroObsoleto(existente));
             lote.update(docRef, {
-              categoria, codigo, titulo, conteudo,
+              categoria, codigo, titulo, conteudo: ccN.conteudo, conteudoGrande: ccN.conteudoGrande,
               dataCriacao, dataRevisao,
               conteudoFormato: 'html',
-              revisao: proximaRevisao(existente.revisao),
+              revisao: revN,
               atualizadoEm: serverTimestamp(),
               atualizadoPor: auth.currentUser?.email || (perfilAtual && perfilAtual.unidade) || '',
             atualizadoPorUnidade: (perfilAtual && perfilAtual.unidade) || ''
             });
           } else {
+            const cc1 = await prepararCampoConteudo(novoId, '01', conteudo);
             lote.set(docRef, {
-              categoria, codigo, titulo, conteudo,
+              categoria, codigo, titulo, conteudo: cc1.conteudo, conteudoGrande: cc1.conteudoGrande,
               dataCriacao, dataRevisao,
               conteudoFormato: 'html',
               revisao: '01',
