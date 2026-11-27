@@ -168,6 +168,7 @@
             <select id="ma-tipo" class="form-select">
               <option value="sistema">Auditoria de sistema (RG 12)</option>
               <option value="relampago">Auditoria relâmpago (RG 71)</option>
+              <option value="rotina">Auditoria de rotina (RG 17)</option>
             </select>
           </div>
           <div class="col-md-8" id="ma-modelo-box">
@@ -325,6 +326,9 @@ const contar = (itens) => {
   itens.forEach(i => { if (i.resultado) { c[i.resultado]++; c.resp++; } });
   return c;
 };
+const TIPO_ROT = { sistema: 'Sistema (RG 12)', relampago: 'Relâmpago (RG 71)', rotina: 'Rotina (RG 17)' };
+const tipoRot = (t) => TIPO_ROT[t] || TIPO_ROT.sistema;
+const tipoRG = (t) => ({ relampago: 'RG 71', rotina: 'RG 17' })[t] || 'RG 12';
 function toast(msg, tipo = 'ok') {
   let t = document.getElementById('au-toast');
   if (!t) {
@@ -434,7 +438,8 @@ function renderPainel() {
   const maxBar = Math.max(1, ...Object.values(porProc).map(v => v.NC + v.OM + v.C));
   $('#au-conteudo').innerHTML = `
     <div class="au-kpis">
-      <div class="au-kpi"><div class="n">${doAno.length}</div><div class="l">Auditorias em ${ano}</div></div>
+      <div class="au-kpi"><div class="n">${doAno.filter(a => a.tipo !== 'rotina').length}</div><div class="l">Auditorias em ${ano}</div></div>
+      <div class="au-kpi"><div class="n">${doAno.filter(a => a.tipo === 'rotina').length}</div><div class="l">Rotinas (RG 17) em ${ano}</div></div>
       <div class="au-kpi"><div class="n">${andamento.length}</div><div class="l">Em andamento</div></div>
       <div class="au-kpi nc"><div class="n">${nc}</div><div class="l">Não conformidades</div></div>
       <div class="au-kpi om"><div class="n">${om}</div><div class="l">Melhorias / obs.</div></div>
@@ -499,7 +504,7 @@ function itemLista(a) {
   return `<div class="au-lista-item ${a.status || ''}" data-abrir="${a.id}">
     <div class="num">${esc(a.numero || '—')}</div>
     <div><div class="tit">${esc(a.processo || '')} ${a.unidade ? '· ' + esc(a.unidade) : ''}</div>
-      <div class="sub">${a.origem === 'importada' ? '<i class="bi bi-archive" title="Importada do Word"></i> ' : ''}${a.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'} · ${fmtBR(a.data)} · ${esc((a.auditores || []).join(', '))}</div></div>
+      <div class="sub">${a.origem === 'importada' ? '<i class="bi bi-archive" title="Importada do Word"></i> ' : ''}${tipoRot(a.tipo)} · ${fmtBR(a.data)} · ${esc((a.auditores || []).join(', '))}</div></div>
     <div class="cont">
       ${a.status === 'concluida' ? '<span class="au-pill fim">concluída</span>' : `<span class="au-pill st">${c.resp}/${c.total}</span>`}
       ${c.NC ? `<span class="au-pill nc">${c.NC} NC</span>` : ''}${c.OM ? `<span class="au-pill om">${c.OM} OM</span>` : ''}
@@ -687,7 +692,7 @@ function renderExec() {
         <div>
           <h2>${esc(a.numero)} · ${esc(a.processo)} ${a.unidade ? '· ' + esc(a.unidade) : ''}</h2>
           <div class="meta">
-            <span><i class="bi bi-tag"></i> ${a.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'}</span>
+            <span><i class="bi bi-tag"></i> ${tipoRot(a.tipo)}</span>
             <span><i class="bi bi-calendar"></i> ${fmtBR(a.data)}</span>
             <span><i class="bi bi-person-badge"></i> ${esc((a.auditores || []).join(', ') || '—')}</span>
             <span><i class="bi bi-person"></i> Auditado: ${esc(a.responsavel || '—')}</span>
@@ -716,7 +721,7 @@ function renderExec() {
     <div class="au-rodape">
       ${ed ? '<button class="btn btn-outline-primary" id="ex-add"><i class="bi bi-plus-circle"></i> Nova constatação</button>' : ''}
       ${ed && a.status !== 'concluida' ? '<button class="btn btn-outline-primary" id="ex-sortear"><i class="bi bi-shuffle"></i> Sortear perguntas</button>' : ''}
-      <button class="btn btn-outline-dark" id="ex-pdf"><i class="bi bi-file-earmark-pdf"></i> ${a.tipo === 'relampago' ? 'RG 71' : 'RG 12'} em PDF</button>
+      <button class="btn btn-outline-dark" id="ex-pdf"><i class="bi bi-file-earmark-pdf"></i> ${tipoRG(a.tipo)} em PDF</button>
       ${a.origem === 'importada' && !a.editavel ? '' : a.status !== 'concluida' ? '<button class="btn btn-success" id="ex-concluir"><i class="bi bi-check2-circle"></i> Concluir</button>'
         : (souQualidade ? '<button class="btn btn-outline-secondary" id="ex-reabrir"><i class="bi bi-unlock"></i> Reabrir</button>' : '')}
       ${souQualidade ? '<button class="btn btn-outline-danger" id="ex-excluir" title="Excluir auditoria"><i class="bi bi-trash"></i></button>' : ''}
@@ -1098,8 +1103,8 @@ async function gerarRelatorio(a) {
     fotosAtual = {}; const sf = await getDocs(collection(db, 'auditorias', a.id, 'fotos'));
     sf.docs.forEach(d => { const f = { id: d.id, ...d.data() }; (fotosAtual[f.itemId] = fotosAtual[f.itemId] || []).push(f); });
   }
-  const rel = a.tipo === 'relampago';
-  const titulo = rel ? 'RG 71 – Auditorias relâmpagos' : 'RG 12 – Relatório de auditoria interna';
+  const rel = a.tipo === 'relampago' || a.tipo === 'rotina';
+  const titulo = a.tipo === 'rotina' ? 'RG 17 – Auditoria de rotina' : rel ? 'RG 71 – Auditorias relâmpagos' : 'RG 12 – Relatório de auditoria interna';
   const itens = a.itens || [];
   const nc = itens.filter(i => i.resultado === 'NC'), om = itens.filter(i => i.resultado === 'OM');
   const fotos = []; let nFoto = 0;
@@ -1130,7 +1135,7 @@ async function gerarRelatorio(a) {
       <div>${a.assinaturas?.auditor ? `<img src="${a.assinaturas.auditor}">` : '<div style="height:70px"></div>'}<div class="linha">${esc((a.auditores || []).join(', '))}<br>Auditor</div></div>
       <div>${a.assinaturas?.auditado ? `<img src="${a.assinaturas.auditado}">` : '<div style="height:70px"></div>'}<div class="linha">${esc(a.responsavel || '')}<br>Auditado</div></div>
     </div>`;
-  await gerarPDF(html, `${rel ? 'RG 71' : 'RG 12'} - ${a.processo}${a.unidade ? ' ' + a.unidade : ''} - ${a.data}.pdf`);
+  await gerarPDF(html, `${tipoRG(a.tipo)} - ${a.processo}${a.unidade ? ' ' + a.unidade : ''} - ${a.data}.pdf`);
 }
 
 /* ============================================================ PROGRAMA RG 11 */
@@ -1394,7 +1399,7 @@ async function renderEncerramento() {
     const s = await getDoc(doc(db, 'auditoria_encerramentos', String(anoEnc)));
     encerramento = s.exists() ? s.data() : null;
   } catch (e) { encerramento = null; }
-  const doAno = auditorias.filter(a => String(a.data || '').startsWith(String(anoEnc)) && a.status === 'concluida' && a.tipo !== 'relampago');
+  const doAno = auditorias.filter(a => String(a.data || '').startsWith(String(anoEnc)) && a.status === 'concluida' && !['relampago', 'rotina'].includes(a.tipo));
   if (!encerramento) encerramento = {
     ano: anoEnc, data: hojeISO(), local: 'Rio do Sul',
     objetivo: 'Avaliar adequação e conformidade do sistema de gestão da qualidade com relação aos requisitos da norma ISO 9001:2015.\nAnalisar possíveis pendências do sistema de gestão da qualidade.',
@@ -1423,7 +1428,7 @@ async function renderEncerramento() {
       </div>
       <div class="qc-section-title">Auditorias incluídas neste encerramento</div>
       <div class="d-flex flex-wrap gap-2" id="en-auds">
-        ${auditorias.filter(a => String(a.data || '').startsWith(String(anoEnc)) && a.tipo !== 'relampago').map(a => `<label class="border rounded px-2 py-1 small"><input type="checkbox" data-aud="${a.id}" ${sel.has(a.id) ? 'checked' : ''} ${dis}> ${esc(a.numero)} · ${esc(a.processo)} ${esc(a.unidade || '')} ${a.status !== 'concluida' ? '<span class="text-warning">(em andamento)</span>' : ''}</label>`).join('') || '<span class="small text-muted">Nenhuma auditoria de sistema neste ano.</span>'}
+        ${auditorias.filter(a => String(a.data || '').startsWith(String(anoEnc)) && !['relampago', 'rotina'].includes(a.tipo)).map(a => `<label class="border rounded px-2 py-1 small"><input type="checkbox" data-aud="${a.id}" ${sel.has(a.id) ? 'checked' : ''} ${dis}> ${esc(a.numero)} · ${esc(a.processo)} ${esc(a.unidade || '')} ${a.status !== 'concluida' ? '<span class="text-warning">(em andamento)</span>' : ''}</label>`).join('') || '<span class="small text-muted">Nenhuma auditoria de sistema neste ano.</span>'}
       </div>
       <div id="en-tabelas" class="mt-3"></div>
     </div>`;
@@ -1501,7 +1506,7 @@ function renderModelos() {
         <button class="btn btn-primary btn-sm" id="md-novo"><i class="bi bi-plus-lg"></i> Novo modelo</button>
       </div>
       <div class="table-responsive"><table class="table table-sm au-tabela"><thead><tr><th>Modelo</th><th>Processo</th><th>Tipo</th><th>Itens</th><th></th></tr></thead><tbody>
-      ${modelos.map(m => `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.processo)}</td><td>${m.tipo === 'relampago' ? 'Relâmpago (RG 71)' : 'Sistema (RG 12)'}</td><td>${(m.itens || []).length}</td>
+      ${modelos.map(m => `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.processo)}</td><td>${tipoRot(m.tipo)}</td><td>${(m.itens || []).length}</td>
         <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary" data-ed="${m.id}"><i class="bi bi-pencil"></i></button>
         <button class="btn btn-sm btn-outline-secondary" data-dup="${m.id}" title="Duplicar"><i class="bi bi-copy"></i></button>
         <button class="btn btn-sm btn-outline-danger" data-ex="${m.id}"><i class="bi bi-trash"></i></button></td></tr>`).join('')}
@@ -1524,7 +1529,7 @@ function renderEditorModelo() {
       <div class="row g-2 mb-3">
         <div class="col-md-5"><label class="form-label small mb-0">Nome do modelo</label><input class="form-control form-control-sm" id="me-nome" value="${esc(m.nome)}"></div>
         <div class="col-md-4"><label class="form-label small mb-0">Processo</label><input class="form-control form-control-sm" id="me-proc" value="${esc(m.processo)}" list="dl-processos"></div>
-        <div class="col-md-3"><label class="form-label small mb-0">Tipo</label><select class="form-select form-select-sm" id="me-tipo"><option value="sistema">Sistema (RG 12)</option><option value="relampago" ${m.tipo === 'relampago' ? 'selected' : ''}>Relâmpago (RG 71)</option></select></div>
+        <div class="col-md-3"><label class="form-label small mb-0">Tipo</label><select class="form-select form-select-sm" id="me-tipo"><option value="sistema">Sistema (RG 12)</option><option value="relampago" ${m.tipo === 'relampago' ? 'selected' : ''}>Relâmpago (RG 71)</option><option value="rotina" ${m.tipo === 'rotina' ? 'selected' : ''}>Rotina (RG 17)</option></select></div>
       </div>
       <div class="table-responsive"><table class="table table-sm table-bordered au-tabela"><thead><tr><th style="width:140px">Seção</th><th style="width:90px">Item ISO</th><th>Pergunta / o que verificar</th><th style="width:120px">Documento</th><th style="width:96px"></th></tr></thead>
       <tbody id="me-itens">${(m.itens || []).map((x, k) => `<tr data-k="${k}">
