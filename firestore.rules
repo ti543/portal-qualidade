@@ -89,7 +89,7 @@ service cloud.firestore {
     // CATÁLOGO DE MÓDULOS
     // ------------------------------------------------------------------
     match /modulos/{slug} {
-      allow read: if logado();
+      allow read: if logado() && request.auth.token.firebase.sign_in_provider != "anonymous";
       allow write: if souQualidade();
 
       match /parametros/{paramId} {
