@@ -211,7 +211,14 @@
     /* Todas as tabelas com a largura da pagina inteira (inclusive as de
        controle de mudancas e aprovacao no fim do documento). */
     .doc-conteudo-leitura.is-html table { border-collapse: collapse; width: 100% !important; max-width: 100%; margin: 10px 0; font-size: 12.5px; table-layout: auto; }
-    .doc-conteudo-leitura.is-html table td, .doc-conteudo-leitura.is-html table th { border: 1px solid #ccc; padding: 6px 8px; vertical-align: top; }
+    /* Texto comprido sem espaço (links, códigos) quebra dentro da célula em vez de
+       empurrar a tabela pra fora da página; as colunas se ajustam ao conteúdo. */
+    .doc-conteudo-leitura.is-html table td, .doc-conteudo-leitura.is-html table th { border: 1px solid #ccc; padding: 6px 8px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; min-width: 2.5em; }
+    .doc-conteudo-leitura.is-html table td *, .doc-conteudo-leitura.is-html table th * { max-width: 100%; overflow-wrap: anywhere; }
+    .doc-conteudo-leitura.is-html table img { height: auto; }
+    /* palavras normais (cabeçalhos e textos curtos) não são cortadas no meio */
+    .doc-conteudo-leitura.is-html table th, .doc-conteudo-leitura.is-html table th * { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+    .doc-conteudo-leitura.is-html { overflow-x: hidden; }
     .doc-conteudo-leitura.is-html table th { background: #eef2ff; font-weight: 700; text-align: center; }
     /* Marcador de quebra de página original do Word (ver
        prepararDocxComMarcadoresDePagina) — na tela é só uma linha
